@@ -116,7 +116,7 @@ const experiment = subsetExperimentByParam([
       content: (
         <div className='bg-white p-8 rounded-lg'>
           <h1>
-            <strong className="font-atkinson">Welcome to our study!</strong>
+            <strong className='font-atkinson'>Welcome to our study!</strong>
           </h1>
           Thank you for participating in our research. In this study, we examine how people's
           engagement differs between various little games we have developed. Over the next 15
@@ -301,37 +301,38 @@ const experiment = subsetExperimentByParam([
                 On this page you will find descriptions of the games we are testing out. Please read
                 through each one carefully before proceeding to the next step.
               </p>
-              
+
               {TASKS.map((task) => (
                 <section key={task}>
                   <h3 className='text-xl'>
                     <strong>{TASK_NAMES[task]}</strong>
                   </h3>
                   <p>{TASK_DESCRIPTIONS[task]}</p>
-                  
                 </section>
               ))}
             </div>
           ),
         },
       },
-      USE_SIMPLIFIED_RANKING ? {
-        name: 'TaskRanking',
-        type: 'TaskRanking',
-        props: {
-          tasks: TASKS,
-          taskNames: TASK_NAMES,
-          taskDescriptions: TASK_DESCRIPTIONS,
-        },
-      } : {
-        name: 'TaskRating',
-        type: 'TaskRating',
-        props: {
-          tasks: TASKS,
-          taskNames: TASK_NAMES,
-          taskDescriptions: TASK_DESCRIPTIONS,
-        },
-      },
+      USE_SIMPLIFIED_RANKING
+        ? {
+            name: 'TaskRanking',
+            type: 'TaskRanking',
+            props: {
+              tasks: TASKS,
+              taskNames: TASK_NAMES,
+              taskDescriptions: TASK_DESCRIPTIONS,
+            },
+          }
+        : {
+            name: 'TaskRating',
+            type: 'TaskRating',
+            props: {
+              tasks: TASKS,
+              taskNames: TASK_NAMES,
+              taskDescriptions: TASK_DESCRIPTIONS,
+            },
+          },
     ],
   },
 
@@ -401,12 +402,12 @@ const experiment = subsetExperimentByParam([
                 <strong>How to play:</strong>
               </p>
               <ul className='pl-5 mb-4'>
-                <li>• Click the letter buttons to spell out words</li>
-                <li>• Press ENTER to submit a word</li>
-                <li>• Press DELETE to remove the last letter</li>
-                <li>• Press SHUFFLE to change the order of the letter-buttons</li>
-                <li>• Press CLEAR to start over with a new word</li>
-                <li>• Press NEW SET to get a different set of 7 letters</li>
+                <li>Click the letter buttons to spell out words</li>
+                <li>Press ENTER to submit a word</li>
+                <li>Press DELETE to remove the last letter</li>
+                <li>Press SHUFFLE to change the order of the letter-buttons</li>
+                <li>Press CLEAR to start over with a new word</li>
+                <li>Press NEW SET to get a different set of 7 letters</li>
               </ul>
             </div>
           ),
@@ -451,7 +452,13 @@ const experiment = subsetExperimentByParam([
                 <strong>How to play:</strong>
               </p>
               <ul className='pl-5 mb-4'>
-                <li>• Click the X buttons to X</li>
+                <li>Create terms resulting in the target using the given numbers and operators</li>
+                <li>Operations are evaluated left to right, e.g. 5 + 5 x 7 = 70</li>
+                <li>Each number and operator can be used multiple times</li>
+                <li>Press ENTER to submit your solution</li>
+                <li>Press DELETE undo the last operation</li>
+                <li>Press CLEAR to delete the entire current solution</li>
+                <li>Press NEW SET for a new pair of numbers and target</li>
               </ul>
             </div>
           ),
