@@ -40,14 +40,14 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
     const set = LETTER_SETS.sample()[0];
     return {
       ...set,
-      letters: [...set.letters].shuffle()
+      letters: [...set.letters].shuffle(),
     };
   }, []);
   const [currentLetterSet, setCurrentLetterSet] = useState(initialSet);
   const [data, setData] = useState<WordGameData>(() => [
     {
       roundIndex: 0,
-      letters: initialSet.letters.join(''),
+      letters: [...initialSet.letters].sort().join(''),
       found: [] as WordData[],
       starttime: now(),
     },
@@ -213,6 +213,15 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
     setCurrentActionList([]);
   };
 
+  const handleShuffleLetters = () => {
+    if (roundOver) return;
+    pushAction('SHUFFLE');
+    setCurrentLetterSet((prev) => ({
+      ...prev,
+      letters: [...prev.letters].shuffle(),
+    }));
+  };
+
   const handleNewLetterSet = () => {
     if (roundOver) return;
 
@@ -221,13 +230,13 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
     const selectedSet = availableSets.sample()[0];
     const newLetterSet = {
       ...selectedSet,
-      letters: [...selectedSet.letters].shuffle()
+      letters: [...selectedSet.letters].shuffle(),
     };
     setData((prev) => [
       ...prev,
       {
         roundIndex: prev.length,
-        letters: newLetterSet.letters.join(''),
+        letters: [...selectedSet.letters].sort().join(''),
         found: [] as WordData[],
         starttime: now(),
       },
@@ -263,6 +272,12 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
           {/* CLEAR and NEW SET buttons in the horizontal layout */}
           {!roundOver && (
             <div className='hidden lg:flex flex-col gap-4 items-center'>
+              <ControlButton
+                onClick={handleShuffleLetters}
+                className='px-4 py-3 text-sm sm:text-base'
+              >
+                SHUFFLE
+              </ControlButton>
               <ControlButton
                 onClick={() => {
                   pushAction('CLEAR');
@@ -397,7 +412,7 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
           <div className='h-0'></div>
           <div
             ref={wordsContainerRef}
-            className='border-4 border-black bg-white p-4 min-h-128 overflow-y-auto space-y-2'
+            className='border-4 border-black bg-white p-4 h-128 overflow-y-auto space-y-2'
           >
             {foundWords.map((wordData, index) => (
               <div key={index} className='p-2 text-center font-bold'>
