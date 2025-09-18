@@ -1,12 +1,12 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, useMemo } from 'react';
 import { LETTER_SETS } from '../utils/wordgamelist';
 import { BaseComponentProps, now, toast, Bounce } from '@adriansteffan/reactive';
 import { motion, AnimatePresence } from 'motion/react';
 
-interface WordData {
+interface WordObj {
   word: string;
-  isCorrect?: boolean;
-  timestamp: number;
+  isCorrect: boolean;
+  submitTime: number;
 }
 
 interface WordGameProps extends BaseComponentProps {
@@ -14,13 +14,44 @@ interface WordGameProps extends BaseComponentProps {
   showCorrectness?: boolean;
 }
 
+interface ActionData {
+  actionIndex: number;
+  button: string;
+  timestamp: number;
+}
+
+interface WordData {
+  foundWordIndex: number;
+  word: string | null;
+  isCorrect: boolean | null;
+  submitTime: number | null;
+  actions: ActionData[];
+}
+
+type WordGameData = {
+  roundIndex: number;
+  letters: string;
+  starttime: number;
+  found: WordData[];
+}[];
+
 export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGameProps) => {
-  const [currentLetterSet, setCurrentLetterSet] = useState(() => LETTER_SETS.sample()[0]);
+  const initialSet = useMemo(() => LETTER_SETS.sample()[0], []);
+  const [currentLetterSet, setCurrentLetterSet] = useState(initialSet);
+  const [data, setData] = useState<WordGameData>(() => [
+    {
+      roundIndex: 0,
+      letters: initialSet.letters.join(''),
+      found: [] as WordData[],
+      starttime: now(),
+    },
+  ]);
+
+  const [currentActionList, setCurrentActionList] = useState<ActionData[]>([]);
   const [currentWord, setCurrentWord] = useState('');
-  const [foundWords, setFoundWords] = useState<WordData[]>([]);
+  const [foundWords, setFoundWords] = useState<WordObj[]>([]);
   const [timeLeft, setTimeLeft] = useState(timelimit);
   const [roundOver, setRoundOver] = useState(false);
-  const [roundStartTime] = useState(now());
   const [showHelp, setShowHelp] = useState(false);
 
   const wordsContainerRef = useRef<HTMLDivElement>(null);
@@ -110,11 +141,20 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
       });
       return;
     }
+    pushAction(letter);
     setCurrentWord((prev) => prev + letter);
+  };
+
+  const pushAction = (button: string) => {
+    setCurrentActionList((prev) => [
+      ...prev,
+      { actionIndex: prev.length, button: button, timestamp: now() },
+    ]);
   };
 
   const handleBackspace = () => {
     if (roundOver) return;
+    pushAction('BACKSPACE');
     setCurrentWord((prev) => prev.slice(0, -1));
   };
 
@@ -144,32 +184,61 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
       return;
     }
 
-    const wordData: WordData = {
+    const wordData: WordObj = {
       word: currentWord,
       isCorrect: currentLetterSet.validWords.includes(currentWord),
-      timestamp: now() - roundStartTime,
+      submitTime: now(),
     };
 
     setFoundWords((prev) => [...prev, wordData]);
     setCurrentWord('');
+
+    setData((prev) => {
+      const updatedData = [...prev];
+      const currentRound = prev[prev.length - 1];
+      currentRound.found.push({
+        foundWordIndex: currentRound.found.length,
+        actions: currentActionList,
+        ...wordData,
+      });
+      return updatedData;
+    });
+
+    setCurrentActionList([]);
   };
 
   const handleNewLetterSet = () => {
     if (roundOver) return;
-    setCurrentLetterSet(LETTER_SETS.sample()[0]);
+
+    // prevent duplicates
+    const availableSets = LETTER_SETS.filter((set) => set.letters !== currentLetterSet.letters);
+    const newLetterSet = availableSets.sample()[0];
+    setData((prev) => [
+      ...prev,
+      {
+        roundIndex: prev.length,
+        letters: newLetterSet.letters.join(''),
+        found: [] as WordData[],
+        starttime: now(),
+      },
+    ]);
+    setCurrentLetterSet(newLetterSet);
     setCurrentWord('');
     setFoundWords([]);
   };
 
   const handleNext = () => {
-    next({
-      timeLeft: timeLeft,
-      foundWords: foundWords,
-      letterSet: currentLetterSet.letters,
-      validWords: currentLetterSet.validWords,
-      totalCorrect: foundWords.filter((w) => w.isCorrect).length,
-      totalAttempts: foundWords.length,
+    const finalData = [...data];
+    const currentRound = finalData[finalData.length - 1];
+    currentRound.found.push({
+      foundWordIndex: currentRound.found.length,
+      actions: currentActionList,
+      word: null,
+      isCorrect: null,
+      submitTime: null,
     });
+
+    next(finalData);
   };
 
   return (
@@ -185,7 +254,10 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
           {!roundOver && (
             <div className='hidden lg:flex flex-col gap-4 items-center'>
               <ControlButton
-                onClick={() => setCurrentWord('')}
+                onClick={() => {
+                  pushAction('CLEAR');
+                  setCurrentWord('');
+                }}
                 className='px-6 py-3 text-sm sm:text-base'
               >
                 CLEAR
@@ -197,7 +269,10 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
                 NEW SET
               </ControlButton>
               <ControlButton
-                onClick={() => setShowHelp(true)}
+                onClick={() => {
+                  pushAction('HELP');
+                  setShowHelp(true);
+                }}
                 className='px-6 py-3 text-sm sm:text-base'
               >
                 HELP
@@ -334,31 +409,34 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50"
+            className='fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50'
             onClick={() => setShowHelp(false)}
           >
             <motion.div
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
-              className="bg-white border-4 border-black rounded-lg shadow-[5px_5px_0px_rgba(0,0,0,1)] p-6 max-w-md mx-4"
+              className='bg-white border-4 border-black rounded-lg shadow-[5px_5px_0px_rgba(0,0,0,1)] p-6 max-w-md mx-4'
               onClick={(e) => e.stopPropagation()}
             >
-              <div className="flex items-center justify-between mb-4">
-                <h3 className="text-xl font-bold">How to Play</h3>
+              <div className='flex items-center justify-between mb-4'>
+                <h3 className='text-xl font-bold'>How to Play</h3>
                 <button
                   onClick={() => setShowHelp(false)}
-                  className="w-8 h-8 rounded-full bg-red-300 border-2 border-black flex items-center justify-center font-bold text-lg hover:bg-red-400 leading-none"
+                  className='w-8 h-8 rounded-full bg-red-300 border-2 border-black flex items-center justify-center font-bold text-lg hover:bg-red-400 leading-none'
                 >
                   ×
                 </button>
               </div>
-              <div className="mb-4">
-                <p className="mb-3">
-                  <strong>Goal:</strong> Create as many valid words as possible using the given set of 7 letters.
+              <div className='mb-4'>
+                <p className='mb-3'>
+                  <strong>Goal:</strong> Create as many valid words as possible using the given set
+                  of 7 letters.
                 </p>
-                <p className="mb-2"><strong>Controls:</strong></p>
-                <ul className="text-sm space-y-1 mb-3 pl-4">
+                <p className='mb-2'>
+                  <strong>Controls:</strong>
+                </p>
+                <ul className='text-sm space-y-1 mb-3 pl-4'>
                   <li>• Click letter buttons to spell words</li>
                   <li>• Press ENTER to submit a word</li>
                   <li>• Press DELETE to remove last letter</li>
@@ -368,7 +446,7 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
               </div>
               <button
                 onClick={() => setShowHelp(false)}
-                className="w-full cursor-pointer bg-white px-4 py-2 border-2 border-black font-bold text-black rounded-lg shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all duration-150"
+                className='w-full cursor-pointer bg-white px-4 py-2 border-2 border-black font-bold text-black rounded-lg shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all duration-150'
               >
                 Got it!
               </button>
