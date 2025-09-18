@@ -30,4 +30,8 @@ ios
 data
 .env
 
+# Tools dependencies
+/tools/*/node_modules/
+/tools/*/package-lock.json
+
 CLAUDE.md

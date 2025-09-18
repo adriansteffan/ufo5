@@ -36,7 +36,13 @@ type WordGameData = {
 }[];
 
 export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGameProps) => {
-  const initialSet = useMemo(() => LETTER_SETS.sample()[0], []);
+  const initialSet = useMemo(() => {
+    const set = LETTER_SETS.sample()[0];
+    return {
+      ...set,
+      letters: [...set.letters].shuffle()
+    };
+  }, []);
   const [currentLetterSet, setCurrentLetterSet] = useState(initialSet);
   const [data, setData] = useState<WordGameData>(() => [
     {
@@ -212,7 +218,11 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
 
     // prevent duplicates
     const availableSets = LETTER_SETS.filter((set) => set.letters !== currentLetterSet.letters);
-    const newLetterSet = availableSets.sample()[0];
+    const selectedSet = availableSets.sample()[0];
+    const newLetterSet = {
+      ...selectedSet,
+      letters: [...selectedSet.letters].shuffle()
+    };
     setData((prev) => [
       ...prev,
       {
