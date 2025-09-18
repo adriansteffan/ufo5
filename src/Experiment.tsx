@@ -404,6 +404,7 @@ const experiment = subsetExperimentByParam([
                 <li>• Click the letter buttons to spell out words</li>
                 <li>• Press ENTER to submit a word</li>
                 <li>• Press DELETE to remove the last letter</li>
+                <li>• Press SHUFFLE to change the order of the letter-buttons</li>
                 <li>• Press CLEAR to start over with a new word</li>
                 <li>• Press NEW SET to get a different set of 7 letters</li>
               </ul>

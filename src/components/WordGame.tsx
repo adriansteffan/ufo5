@@ -465,6 +465,7 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
                   <li>• Click letter buttons to spell words</li>
                   <li>• Press ENTER to submit a word</li>
                   <li>• Press DELETE to remove last letter</li>
+                  <li>• Press SHUFFLE to change the order of the letter-buttons</li>
                   <li>• Press CLEAR to delete the full current input</li>
                   <li>• Press NEW SET for different letters</li>
                 </ul>
