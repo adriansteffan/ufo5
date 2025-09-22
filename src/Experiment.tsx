@@ -301,6 +301,7 @@ const experiment = subsetExperimentByParam([
                 On this page you will find descriptions of the games we are testing out. Please read
                 through each one carefully before proceeding to the next step.
               </p>
+              <br/>
 
               {TASKS.map((task) => (
                 <section key={task}>
@@ -308,6 +309,7 @@ const experiment = subsetExperimentByParam([
                     <strong>{TASK_NAMES[task]}</strong>
                   </h3>
                   <p>{TASK_DESCRIPTIONS[task]}</p>
+                  <br/>
                 </section>
               ))}
             </div>
@@ -497,13 +499,21 @@ const experiment = subsetExperimentByParam([
                 You can generate new singles from a deck of cards and drag a pair onto the table on
                 your screen in order to set up a date. You have 4 minutes in total, so have fun
                 playing cupid! Keep in mind, it's just like in real life: Some couples work out
-                better than others, but you won't find out how for now.
+                better than others, but you won't find out for now.
               </p>
               <p>
                 <strong>How to play:</strong>
               </p>
               <ul className='pl-5 mb-4'>
-                <li>• Drag Player Cards to do X</li>
+                <li>Drag people from your hand to the matching slots</li>
+                <li>Click "MATCH" to create a blind date from the two slots</li>
+                <li>Click the red ✕ to send a person home an get a new one</li>
+                <li>Click the profile picture to view a person in detail</li>
+                <li>Use "NEW HAND" to replace your whole hand people</li>
+                <li>
+                  Clicking on cards in the slots will return them to your hand, "CLEAR" will
+                  return both
+                </li>
               </ul>
             </div>
           ),
@@ -513,7 +523,7 @@ const experiment = subsetExperimentByParam([
         name: 'DatingGame',
         type: 'DatingGame',
         props: {
-          // Dating Game specific props
+          timelimit: TASK_TIME_LIMIT,
         },
       },
     ],
@@ -546,7 +556,7 @@ const experiment = subsetExperimentByParam([
                 <strong>How to play:</strong>
               </p>
               <ul className='pl-5 mb-4'>
-                <li>• Drag a player card to do X</li>
+                <li>Drag a player card to do X</li>
               </ul>
             </div>
           ),
