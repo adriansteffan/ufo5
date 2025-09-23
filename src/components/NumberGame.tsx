@@ -549,7 +549,7 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
           <div className='h-0'></div>
           <div
             ref={expressionsContainerRef}
-            className='border-4 border-black bg-white p-4 h-128 overflow-y-auto space-y-2'
+            className='border-3 border-black bg-white p-4 h-128 overflow-y-auto space-y-2 shadow-[3px_3px_0px_rgba(0,0,0,1)]'
           >
             {foundExpressions.map((exprData, index) => (
               <div key={index} className='p-2 text-center font-bold'>

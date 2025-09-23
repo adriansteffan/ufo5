@@ -2,36 +2,25 @@ import React, { useEffect, useRef, useState } from 'react';
 import { BaseComponentProps, now } from '@adriansteffan/reactive';
 import { motion, AnimatePresence } from 'motion/react';
 import { CgSearch } from 'react-icons/cg';
-import { MALE_NAMES, FEMALE_NAMES, TRAIT_DISPLAY_WORDS, MISC_DISPLAY_WORDS } from '../utils/datinggamelist';
+import { COUPLE_MESSAGES } from '../utils/datinggamelist';
+import { createPersonGenerator, judgeCouple, type Person } from '../utils/datinggamelogic';
 
 /**
  * TODOs:
  *
  * general refactoring
  *
- * drop animation is buggy
- *
  * data piping - have a dedicated character database that gets saved
  *
- * judge mechanic: produce emojis from recent matches ()
  *
  */
 
-interface Person {
-  id: number; // autoincrementing from 0, so safe for ids unless we play this game for millions of years
-  name: string;
-  image: string;
-  gender: 'male' | 'female';
-  lookingFor: 'male' | 'female' | 'both';
-  coreTraits: CoreTraits;
-  miscPreferences: MiscPreferences;
-  displayTraits: string[]; // Generated from core traits and preferences
-}
 
 interface Couple {
   person1: Person;
   person2: Person;
   matchTime: number;
+  matchScore: number; // 0-100, calculated compatibility score
 }
 
 interface ActionData {
@@ -57,152 +46,121 @@ type DatingGameData = {
 
 const MAX_HAND_SIZE = 5;
 
+const generateRandomPerson = createPersonGenerator();
 
-// Core personality scales (0-10, 5 is average)
-interface CoreTraits {
-  openness: number; // 0=traditional, 10=very open to new experiences
-  sportiness: number; // 0=sedentary, 10=very athletic
-  social: number; // 0=introverted, 10=very social
-  natural: number; // 0=glamorous/makeup, 10=natural/low-maintenance
-}
+// News ticker message generation
+const generateNewsMessage = (couples: Couple[]): string => {
+  // Only show couple messages, return empty string if no couples yet
+  if (couples.length === 0) {
+    return '';
+  }
 
-// Binary preferences (neutral, positive, or negative)
-type PreferenceValue = 'neutral' | 'positive' | 'negative';
+  // Only use the last 5 couples (most recent)
+  const recentCouples = couples.slice(-5);
+  const randomCouple = recentCouples[Math.floor(Math.random() * recentCouples.length)];
+  const score = randomCouple.matchScore;
 
-interface MiscPreferences {
-  cats: PreferenceValue;
-  dogs: PreferenceValue;
-  smoking: PreferenceValue;
-  drinking: PreferenceValue;
-  travel: PreferenceValue;
-  cooking: PreferenceValue;
-  reading: PreferenceValue;
-  music: PreferenceValue;
-  movies: PreferenceValue;
-  outdoors: PreferenceValue;
-}
+  // Add noise to score for message selection (even good couples have awkward moments)
+  const noisyScore = score + (Math.random() - 0.5) * 30; // +-15 points of noise
 
+  let messageCategory: keyof typeof COUPLE_MESSAGES;
+  if (noisyScore >= 80) messageCategory = 'veryPositive';
+  else if (noisyScore >= 60) messageCategory = 'positive';
+  else if (noisyScore >= 40) messageCategory = 'neutral';
+  else if (noisyScore >= 20) messageCategory = 'negative';
+  else messageCategory = 'veryNegative';
 
-const MEN_IMAGES = Array.from({ length: 53 }, (_, i) => `/dating/men/man_${i + 1}.png`);
-const WOMEN_IMAGES = Array.from({ length: 61 }, (_, i) => `/dating/women/woman_${i + 1}.png`);
+  const messages = COUPLE_MESSAGES[messageCategory];
+  const template = messages[Math.floor(Math.random() * messages.length)];
 
-// Helper functions for trait generation
-const generateCoreTraits = (): CoreTraits => {
-  // Generate traits using uniform distribution (0-10)
-  const uniformRandom = () => Math.floor(Math.random() * 11); // 0 to 10 inclusive
-
-  return {
-    openness: uniformRandom(),
-    sportiness: uniformRandom(),
-    social: uniformRandom(),
-    natural: uniformRandom(),
-  };
+  // Replace placeholders with actual names
+  return template
+    .replace(/{person1}/g, randomCouple.person1.name)
+    .replace(/{person2}/g, randomCouple.person2.name);
 };
 
-const generateMiscPreferences = (): MiscPreferences => {
-  const randomPreference = (): PreferenceValue => {
-    const rand = Math.random();
-    if (rand < 0.7) return 'neutral'; // 70% neutral
-    return rand < 0.85 ? 'positive' : 'negative'; // 15% positive, 15% negative
-  };
+const NewsTicker = React.memo(({ couples, onTextChange }: { couples: Couple[], onTextChange?: (text: string) => void }) => {
+  const couplesRef = useRef(couples);
+  const intervalRef = useRef<NodeJS.Timeout | null>(null);
+  const currentMessageRef = useRef('');
+  const phaseRef = useRef<'typing' | 'showing' | 'deleting' | 'idle'>('idle');
+  const messageStartTime = useRef(0);
 
-  return {
-    cats: randomPreference(),
-    dogs: randomPreference(),
-    smoking: randomPreference(),
-    drinking: randomPreference(),
-    travel: randomPreference(),
-    cooking: randomPreference(),
-    reading: randomPreference(),
-    music: randomPreference(),
-    movies: randomPreference(),
-    outdoors: randomPreference(),
-  };
-};
+  // Update couples ref without triggering re-render
+  useEffect(() => {
+    couplesRef.current = couples;
+  }, [couples]);
 
-const generateDisplayTraits = (
-  coreTraits: CoreTraits,
-  miscPreferences: MiscPreferences,
-): string[] => {
-  const traits: string[] = [];
-
-  // Add core trait displays with 5 levels
-  Object.entries(coreTraits).forEach(([traitName, value]) => {
-    const traitKey = traitName as keyof typeof TRAIT_DISPLAY_WORDS;
-    let level: 'veryLow' | 'low' | 'medium' | 'high' | 'veryHigh';
-
-    if (value <= 2) level = 'veryLow';
-    else if (value <= 4) level = 'low';
-    else if (value <= 6) level = 'medium';
-    else if (value <= 8) level = 'high';
-    else level = 'veryHigh';
-
-    const options = TRAIT_DISPLAY_WORDS[traitKey][level];
-    traits.push(options[Math.floor(Math.random() * options.length)]);
-  });
-
-  // Add only 1-2 misc preference displays (not all of them)
-  const nonNeutralPrefs = Object.entries(miscPreferences).filter(
-    ([_, value]) => value !== 'neutral',
-  );
-  const numMiscTraits = Math.min(nonNeutralPrefs.length, Math.floor(Math.random() * 2) + 1); // 1-2 misc traits
-  const selectedPrefs = nonNeutralPrefs.sort(() => Math.random() - 0.5).slice(0, numMiscTraits);
-
-  selectedPrefs.forEach(([prefName, value]) => {
-    const prefKey = prefName as keyof typeof MISC_DISPLAY_WORDS;
-    const options = MISC_DISPLAY_WORDS[prefKey][value];
-    traits.push(options[Math.floor(Math.random() * options.length)]);
-  });
-
-  // Sort traits by length (longest first, then shorter ones together)
-  traits.sort((a, b) => b.length - a.length);
-
-  return traits;
-};
-
-const createPersonGenerator = () => {
-  let personCount: number = 0;
-
-  const generateRandomPerson = (): Person => {
-    const gender = Math.random() < 0.5 ? 'male' : 'female';
-    const name = gender === 'male' ? MALE_NAMES.sample()[0] : FEMALE_NAMES.sample()[0];
-    const image = gender === 'male' ? MEN_IMAGES.sample()[0] : WOMEN_IMAGES.sample()[0];
-
-    // Generate lookingFor preference (75% straight, 5% gay, 20% bi)
-    const rand = Math.random();
-    let lookingFor: 'male' | 'female' | 'both';
-    if (rand < 0.75) {
-      lookingFor = gender === 'male' ? 'female' : 'male'; // straight
-    } else if (rand < 0.8) {
-      lookingFor = gender; // gay
-    } else {
-      lookingFor = 'both'; // bi
+  // Main animation loop - runs every 80ms like the timer
+  useEffect(() => {
+    if (couples.length === 0) {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
+      currentMessageRef.current = '';
+      phaseRef.current = 'idle';
+      onTextChange?.('');
+      return;
     }
 
-    // Generate personality traits
-    const coreTraits = generateCoreTraits();
-    const miscPreferences = generateMiscPreferences();
-    const displayTraits = generateDisplayTraits(coreTraits, miscPreferences);
+    if (!intervalRef.current) {
+      // Start with first message
+      const firstMessage = generateNewsMessage(couplesRef.current);
+      if (firstMessage) {
+        currentMessageRef.current = firstMessage;
+        phaseRef.current = 'typing';
+        messageStartTime.current = Date.now();
+      }
 
-    const id = personCount;
-    personCount = personCount + 1;
+      intervalRef.current = setInterval(() => {
+        const now = Date.now();
+        const elapsed = now - messageStartTime.current;
 
-    return {
-      id,
-      name,
-      image,
-      gender,
-      lookingFor,
-      coreTraits,
-      miscPreferences,
-      displayTraits,
+        if (phaseRef.current === 'typing') {
+          const targetLength = Math.min(Math.floor(elapsed / 80), currentMessageRef.current.length);
+          const displayText = currentMessageRef.current.substring(0, targetLength);
+          onTextChange?.(displayText);
+
+          if (targetLength >= currentMessageRef.current.length) {
+            phaseRef.current = 'showing';
+            messageStartTime.current = now;
+          }
+        } else if (phaseRef.current === 'showing') {
+          if (elapsed >= 10000) { // Show for 10 seconds
+            phaseRef.current = 'deleting';
+            messageStartTime.current = now;
+          }
+        } else if (phaseRef.current === 'deleting') {
+          const targetLength = Math.max(currentMessageRef.current.length - Math.floor(elapsed / 80), 0);
+          const displayText = currentMessageRef.current.substring(0, targetLength);
+          onTextChange?.(displayText);
+
+          if (targetLength <= 0) {
+            // Get next message
+            const nextMessage = generateNewsMessage(couplesRef.current);
+            if (nextMessage) {
+              currentMessageRef.current = nextMessage;
+              phaseRef.current = 'typing';
+              messageStartTime.current = now;
+            } else {
+              phaseRef.current = 'idle';
+            }
+          }
+        }
+      }, 80);
+    }
+
+    return () => {
+      if (intervalRef.current) {
+        clearInterval(intervalRef.current);
+        intervalRef.current = null;
+      }
     };
-  };
+  }, [couples.length === 0]);
 
-  return generateRandomPerson;
-};
-
-const generateRandomPerson = createPersonGenerator();
+  return null; // Hidden component, only for logic
+});
 
 const Timer = React.memo(({ timeLeft }: { timeLeft: number }) => (
   <div className='p-2 pt-4 flex justify-center'>
@@ -522,6 +480,7 @@ export const DatingGame = ({ next, timelimit }: DatingGameProps) => {
   const slot1Ref = useRef<HTMLDivElement>(null);
   const slot2Ref = useRef<HTMLDivElement>(null);
 
+  const [newsText, setNewsText] = useState('');
   const [hand, setHand] = useState<Person[]>(() =>
     Array.from({ length: MAX_HAND_SIZE }, () => generateRandomPerson()),
   );
@@ -673,10 +632,12 @@ export const DatingGame = ({ next, timelimit }: DatingGameProps) => {
     if (roundOver || !matchSlot1 || !matchSlot2) return;
 
     pushAction('MATCH');
+    const matchScore = judgeCouple(matchSlot1, matchSlot2);
     const newCouple: Couple = {
       person1: matchSlot1,
       person2: matchSlot2,
       matchTime: now(),
+      matchScore,
     };
 
     setCouples((prev) => [...prev, newCouple]);
@@ -766,8 +727,13 @@ export const DatingGame = ({ next, timelimit }: DatingGameProps) => {
 
   return (
     <div className='min-h-screen w-full pt-10 bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] flex flex-col overflow-hidden'>
+      {/* Hidden News Ticker - just for logic */}
+      <div className="hidden">
+        <NewsTicker couples={couples} onTextChange={setNewsText} />
+      </div>
+
       {/* Main Section - Timer, Matching Area, and Recent Matches */}
-      <div className='p-2 flex'>
+      <div className='p-2 flex mt-8'>
         {/* Left Side - Timer */}
         <div className='w-56 flex flex-col items-center'>
           <Timer timeLeft={timeLeft} />
@@ -891,11 +857,22 @@ export const DatingGame = ({ next, timelimit }: DatingGameProps) => {
                 ))}
             </AnimatePresence>
           </div>
+
+          {/* News ticker text below recent matches */}
+          {couples.length > 0 && (
+            <div className='w-full mt-8'>
+              <div className='bg-white border-2 border-black p-3 w-40 h-24 flex items-start overflow-hidden shadow-[4px_4px_0px_rgba(0,0,0,1)]'>
+                <span className='text-sm font-medium leading-tight'>
+                  {newsText}
+                </span>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
       {/* Bottom Section - Hand */}
-      <div className='flex justify-center'>
+      <div className='flex mt-5 justify-center'>
         {/* Hand - Centered */}
         <motion.div
           className='flex gap-3 justify-center'
