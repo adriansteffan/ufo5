@@ -902,7 +902,7 @@ export const DatingGame = ({ next, timelimit }: DatingGameProps) => {
           layout
           transition={{ type: 'spring', stiffness: 250, damping: 50 }}
         >
-          <AnimatePresence mode='popLayout'>
+          <AnimatePresence>
             {hand.map((person) => (
               <AnimatedPersonCard
                 key={person.id}
