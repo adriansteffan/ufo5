@@ -1,154 +1,121 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { BaseComponentProps, now } from '@adriansteffan/reactive';
 import { motion, AnimatePresence } from 'motion/react';
 import { CgSearch } from 'react-icons/cg';
-import { COUPLE_MESSAGES } from '../utils/datinggamelist';
-import { createPersonGenerator, judgeCouple, type Person } from '../utils/datinggamelogic';
+import {
+  createPersonGenerator,
+  judgeCouple,
+  generateNewsMessage,
+  type Person,
+} from '../utils/datinggamelogic';
 
-/**
- * TODOs:
- *
- * general refactoring
- *
- * data piping - have a dedicated character database that gets saved
- *
- *
- */
-
+const ACTIONS = {
+  INITIAL_HAND: 'INITIAL_HAND',
+  PLACE_SLOT1: 'PLACE_SLOT1',
+  PLACE_SLOT2: 'PLACE_SLOT2',
+  REMOVE_SLOT1: 'REMOVE_SLOT1',
+  REMOVE_SLOT2: 'REMOVE_SLOT2',
+  MATCH: 'MATCH',
+  CLEAR_SLOTS: 'CLEAR_SLOTS',
+  GENERATE_NEW: 'GENERATE_NEW',
+  EXCHANGE_PERSON: 'EXCHANGE_PERSON',
+  ADD_TO_HAND: 'ADD_TO_HAND',
+  GAME_END: 'GAME_END',
+  HELP: 'HELP',
+} as const;
 
 interface Couple {
   person1: Person;
   person2: Person;
   matchTime: number;
-  matchScore: number; // 0-100, calculated compatibility score
+  matchScore: number;
 }
 
-interface ActionData {
+interface ActionLog {
   actionIndex: number;
   action: string;
-  personId?: number;
+  involvedPersonIds?: number[];
   timestamp: number;
 }
 
-interface MatchData {
+interface MatchRecord {
   matchIndex: number;
-  person1: Person | null;
-  person2: Person | null;
-  matchTime: number | null;
-  actions: ActionData[];
+  partner1: Person;
+  partner2: Person;
+  timestamp: number;
+  assignedScore: number;
 }
 
 type DatingGameData = {
-  roundIndex: number;
+  peopleDatabase: Person[];
+  matchDatabase: MatchRecord[];
+  actionLog: ActionLog[];
   starttime: number;
-  matches: MatchData[];
-}[];
+};
 
 const MAX_HAND_SIZE = 5;
+const MAX_RECENT_COUPLES = 5;
+const NEWS_TICKER_ANIMATION_SPEED_MS = 80;
 
 const generateRandomPerson = createPersonGenerator();
 
-// News ticker message generation
-const generateNewsMessage = (couples: Couple[]): string => {
-  // Only show couple messages, return empty string if no couples yet
-  if (couples.length === 0) {
-    return '';
-  }
-
-  // Only use the last 5 couples (most recent)
-  const recentCouples = couples.slice(-5);
-  const randomCouple = recentCouples[Math.floor(Math.random() * recentCouples.length)];
-  const score = randomCouple.matchScore;
-
-  // Add noise to score for message selection (even good couples have awkward moments)
-  const noisyScore = score + (Math.random() - 0.5) * 30; // +-15 points of noise
-
-  let messageCategory: keyof typeof COUPLE_MESSAGES;
-  if (noisyScore >= 80) messageCategory = 'veryPositive';
-  else if (noisyScore >= 60) messageCategory = 'positive';
-  else if (noisyScore >= 40) messageCategory = 'neutral';
-  else if (noisyScore >= 20) messageCategory = 'negative';
-  else messageCategory = 'veryNegative';
-
-  const messages = COUPLE_MESSAGES[messageCategory];
-  const template = messages[Math.floor(Math.random() * messages.length)];
-
-  // Replace placeholders with actual names
-  return template
-    .replace(/{person1}/g, randomCouple.person1.name)
-    .replace(/{person2}/g, randomCouple.person2.name);
-};
-
-const NewsTicker = React.memo(({ couples, onTextChange }: { couples: Couple[], onTextChange?: (text: string) => void }) => {
+const NewsTicker = React.memo(({ couples }: { couples: Couple[] }) => {
+  const [displayText, setDisplayText] = useState('');
   const couplesRef = useRef(couples);
   const intervalRef = useRef<NodeJS.Timeout | null>(null);
   const currentMessageRef = useRef('');
   const phaseRef = useRef<'typing' | 'showing' | 'deleting' | 'idle'>('idle');
   const messageStartTime = useRef(0);
 
-  // Update couples ref without triggering re-render
+  // Update couples without triggering full re-render - only needed as data source
   useEffect(() => {
     couplesRef.current = couples;
   }, [couples]);
 
-  // Main animation loop - runs every 80ms like the timer
+  // Main animation loop
   useEffect(() => {
-    if (couples.length === 0) {
-      if (intervalRef.current) {
-        clearInterval(intervalRef.current);
-        intervalRef.current = null;
-      }
-      currentMessageRef.current = '';
-      phaseRef.current = 'idle';
-      onTextChange?.('');
-      return;
-    }
-
     if (!intervalRef.current) {
-      // Start with first message
-      const firstMessage = generateNewsMessage(couplesRef.current);
-      if (firstMessage) {
-        currentMessageRef.current = firstMessage;
-        phaseRef.current = 'typing';
-        messageStartTime.current = Date.now();
-      }
+      currentMessageRef.current = generateNewsMessage(couplesRef.current, MAX_RECENT_COUPLES);
+      phaseRef.current = 'typing';
+      messageStartTime.current = Date.now();
 
       intervalRef.current = setInterval(() => {
         const now = Date.now();
         const elapsed = now - messageStartTime.current;
 
         if (phaseRef.current === 'typing') {
-          const targetLength = Math.min(Math.floor(elapsed / 80), currentMessageRef.current.length);
+          const targetLength = Math.min(
+            Math.floor(elapsed / NEWS_TICKER_ANIMATION_SPEED_MS),
+            currentMessageRef.current.length,
+          );
           const displayText = currentMessageRef.current.substring(0, targetLength);
-          onTextChange?.(displayText);
+          setDisplayText(displayText);
 
           if (targetLength >= currentMessageRef.current.length) {
             phaseRef.current = 'showing';
             messageStartTime.current = now;
           }
         } else if (phaseRef.current === 'showing') {
-          if (elapsed >= 10000) { // Show for 10 seconds
+          // Show for 10 seconds
+          if (elapsed >= 10000) {
             phaseRef.current = 'deleting';
             messageStartTime.current = now;
           }
         } else if (phaseRef.current === 'deleting') {
-          const targetLength = Math.max(currentMessageRef.current.length - Math.floor(elapsed / 80), 0);
+          const targetLength = Math.max(
+            currentMessageRef.current.length - Math.floor(elapsed / NEWS_TICKER_ANIMATION_SPEED_MS),
+            0,
+          );
           const displayText = currentMessageRef.current.substring(0, targetLength);
-          onTextChange?.(displayText);
+          setDisplayText(displayText);
 
-          if (targetLength <= 0) {
-            // Get next message
-            const nextMessage = generateNewsMessage(couplesRef.current);
-            if (nextMessage) {
-              currentMessageRef.current = nextMessage;
-              phaseRef.current = 'typing';
-              messageStartTime.current = now;
-            } else {
-              phaseRef.current = 'idle';
-            }
+          if (targetLength === 0) {
+            currentMessageRef.current = generateNewsMessage(couplesRef.current, MAX_RECENT_COUPLES);
+            phaseRef.current = 'typing';
+            messageStartTime.current = now;
           }
         }
-      }, 80);
+      }, NEWS_TICKER_ANIMATION_SPEED_MS);
     }
 
     return () => {
@@ -157,18 +124,49 @@ const NewsTicker = React.memo(({ couples, onTextChange }: { couples: Couple[], o
         intervalRef.current = null;
       }
     };
-  }, [couples.length === 0]);
+  }, []);
 
-  return null; // Hidden component, only for logic
+  return (
+    <motion.div className='w-full mt-8' layout>
+      <div className='bg-white border-2 border-black p-3 w-40 h-24 flex items-start overflow-hidden shadow-[4px_4px_0px_rgba(0,0,0,1)]'>
+        <span className='text-sm font-medium leading-tight'>{displayText}</span>
+      </div>
+    </motion.div>
+  );
 });
 
-const Timer = React.memo(({ timeLeft }: { timeLeft: number }) => (
-  <div className='p-2 pt-4 flex justify-center'>
-    <div className='text-2xl font-bold text-center'>
-      {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+const Timer = React.memo(({ timelimit, roundOver, onEnd }: {
+  timelimit: number;
+  roundOver: boolean;
+  onEnd: () => void;
+}) => {
+  const [timeLeft, setTimeLeft] = useState(timelimit);
+
+  useEffect(() => {
+    if (roundOver || timeLeft <= 0) return;
+
+    const timer = setInterval(() => {
+      setTimeLeft((prev) => {
+        const newTime = prev - 1;
+        if (newTime <= 0) {
+          onEnd();
+          return 0;
+        }
+        return newTime;
+      });
+    }, 1000);
+
+    return () => clearInterval(timer);
+  }, [roundOver, timeLeft, onEnd]);
+
+  return (
+    <div className='p-2 pt-4 flex justify-center'>
+      <div className='text-2xl font-bold text-center'>
+        {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+      </div>
     </div>
-  </div>
-));
+  );
+});
 
 const EnlargedCardModal = React.memo(
   ({ person, onClose }: { person: Person; onClose: () => void }) => {
@@ -187,7 +185,6 @@ const EnlargedCardModal = React.memo(
         >
           <PersonCard
             person={person}
-            isInSlot={false}
             disableHover={true}
             disableDrag={true}
             isEnlarged={true}
@@ -226,21 +223,19 @@ const AnimatedPersonCard = React.memo(
     HTMLDivElement,
     {
       person: Person;
-      isNew: boolean;
       onDismiss: () => void;
       onEnlarge: () => void;
       onDragEnd: (person: Person, info: any) => void;
       onDrag: (person: Person, info: any) => void;
       roundOver: boolean;
     }
-  >(({ person, isNew, onDismiss, onEnlarge, onDragEnd, onDrag, roundOver }, ref) => {
-    const [hasAnimated, setHasAnimated] = React.useState(!isNew);
+  >(({ person, onDismiss, onEnlarge, onDragEnd, onDrag, roundOver }, ref) => {
 
     return (
       <motion.div
         ref={ref}
         layout
-        initial={hasAnimated ? false : { opacity: 0, y: 50 }}
+        initial={roundOver ? false : { opacity: 0, y: 50 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{
           type: 'spring',
@@ -248,7 +243,6 @@ const AnimatedPersonCard = React.memo(
           damping: 35,
           layout: { type: 'spring', stiffness: 400, damping: 30 },
         }}
-        onAnimationComplete={() => setHasAnimated(true)}
       >
         <PersonCard
           person={person}
@@ -275,9 +269,9 @@ export const DropZone = React.memo(
   >(({ person, isHighlighted, onTap, onEnlarge }, ref) => (
     <motion.div
       ref={ref}
-      className={`w-43 h-60 border-2 border-dashed rounded-3xl flex items-center justify-center cursor-pointer bg-white ${
+      className={`w-43 h-60 border-2 border-dashed rounded-3xl flex items-center justify-center bg-white ${
         person
-          ? 'border-green-400'
+          ? 'border-green-400 cursor-pointer'
           : isHighlighted
             ? 'border-blue-400 bg-blue-50'
             : 'border-gray-400'
@@ -310,7 +304,6 @@ const PersonCard = React.memo(
     onClick,
     onDismiss,
     onEnlarge,
-    isDragging,
     onDragEnd,
     onDrag,
     roundOver,
@@ -323,7 +316,6 @@ const PersonCard = React.memo(
     onClick?: () => void;
     onDismiss?: () => void;
     onEnlarge?: () => void;
-    isDragging?: boolean;
     onDragEnd?: (person: Person, info: any) => void;
     onDrag?: (person: Person, info: any) => void;
     roundOver?: boolean;
@@ -340,17 +332,11 @@ const PersonCard = React.memo(
         dragSnapToOrigin={true}
         dragElastic={0.1}
         whileHover={!disableHover && !roundOver ? { scale: 1.05 } : {}}
-        whileDrag={{ scale: 1.1, zIndex: 1000, rotate: 5 }}
+        whileDrag={{ scale: 1.1, zIndex: 1000, rotate: 5, cursor: 'grabbing' }}
         onDrag={(_, info) => onDrag?.(person, info)}
         onDragEnd={(_, info) => onDragEnd?.(person, info)}
         className={`relative ${person.gender === 'female' ? 'bg-gradient-to-br from-pink-100 to-pink-200' : 'bg-gradient-to-br from-blue-100 to-blue-200'} border-2 border-black rounded-2xl ${!disableHover && !roundOver ? 'cursor-grab' : 'cursor-pointer'} select-none ${isInSlot ? 'w-36 h-54' : 'w-48 h-72'}`}
-        style={{
-          zIndex: isDragging ? 1000 : 1,
-          pointerEvents: 'auto',
-          cursor: isDragging ? 'grabbing' : undefined,
-        }}
       >
-        {/* Exchange button for hand cards */}
         {!isInSlot && onDismiss && (
           <button
             onClick={(e) => {
@@ -362,7 +348,8 @@ const PersonCard = React.memo(
             ✕
           </button>
         )}
-
+        
+        {/* Photo container */}
         <motion.div
           className={`relative mt-3 mb-2 enlarge-area ${isInSlot ? 'mx-2' : 'mx-3'}`}
           initial='initial'
@@ -383,7 +370,7 @@ const PersonCard = React.memo(
             </motion.div>
           )}
 
-          {/* Photo placeholder */}
+          
           <div
             className={`cursor-pointer bg-white rounded-2xl border-2 border-black overflow-hidden ${isInSlot ? 'h-16' : 'h-20'}`}
           >
@@ -402,17 +389,11 @@ const PersonCard = React.memo(
           <div className='flex items-center gap-2 mt-1'>
             <span className='text-xs text-gray-600'>attracted to:</span>
             <div className='flex gap-1'>
-              {person.lookingFor === 'male' && (
+              {(person.lookingFor === 'male' || person.lookingFor === 'both') && (
                 <div className='w-3 h-3 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 border border-dashed border-black'></div>
               )}
-              {person.lookingFor === 'female' && (
+              {(person.lookingFor === 'female' || person.lookingFor === 'both') && (
                 <div className='w-3 h-3 rounded-full bg-gradient-to-br from-pink-100 to-pink-200 border border-dashed border-black'></div>
-              )}
-              {person.lookingFor === 'both' && (
-                <>
-                  <div className='w-3 h-3 rounded-full bg-gradient-to-br from-blue-100 to-blue-200 border border-dashed border-black'></div>
-                  <div className='w-3 h-3 rounded-full bg-gradient-to-br from-pink-100 to-pink-200 border border-dashed border-black'></div>
-                </>
               )}
             </div>
           </div>
@@ -465,10 +446,6 @@ const PersonCard = React.memo(
   },
 );
 
-interface DatingGameProps extends BaseComponentProps {
-  timelimit: number;
-}
-
 // Helper function to check if click was on image/enlarge area
 // We need these checks sinde stopPropagation is wonky for motion's onTaps
 const isEnlargeAreaClick = (e: Event): boolean => {
@@ -476,270 +453,235 @@ const isEnlargeAreaClick = (e: Event): boolean => {
   return !!(target.closest('.enlarge-area') || target.closest('img'));
 };
 
-export const DatingGame = ({ next, timelimit }: DatingGameProps) => {
+export const DatingGame = ({
+  next,
+  timelimit,
+}: {
+  timelimit: number;
+} & BaseComponentProps) => {
   const slot1Ref = useRef<HTMLDivElement>(null);
   const slot2Ref = useRef<HTMLDivElement>(null);
 
-  const [newsText, setNewsText] = useState('');
-  const [hand, setHand] = useState<Person[]>(() =>
-    Array.from({ length: MAX_HAND_SIZE }, () => generateRandomPerson()),
-  );
-  const [newCardIds, setNewCardIds] = useState<Set<number>>(new Set());
+  const [hand, setHand] = useState<Person[]>([]);
   const [matchSlot1, setMatchSlot1] = useState<Person | null>(null);
   const [matchSlot2, setMatchSlot2] = useState<Person | null>(null);
+  const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
   const [couples, setCouples] = useState<Couple[]>([]);
-  const [timeLeft, setTimeLeft] = useState(timelimit || 300);
   const [roundOver, setRoundOver] = useState(false);
-  const [currentActionList, setCurrentActionList] = useState<ActionData[]>([]);
   const [enlargedPerson, setEnlargedPerson] = useState<Person | null>(null);
   const [showHelp, setShowHelp] = useState(false);
-  const [data, setData] = useState<DatingGameData>(() => [
-    {
-      roundIndex: 0,
+  const [data, setData] = useState<DatingGameData>(() => {
+    const initialHand = Array.from({ length: MAX_HAND_SIZE }, () => generateRandomPerson());
+    return {
+      peopleDatabase: [...initialHand],
+      matchDatabase: [],
+      actionLog: [
+        {
+          actionIndex: 0,
+          action: ACTIONS.INITIAL_HAND,
+          involvedPersonIds: initialHand.map((p) => p.id),
+          timestamp: now(),
+        },
+      ],
       starttime: now(),
-      matches: [] as MatchData[],
-    },
-  ]);
-
-  const pushAction = (action: string, personId?: number) => {
-    const actionData: ActionData = {
-      actionIndex: currentActionList.length,
-      action,
-      personId,
-      timestamp: now(),
     };
-    setCurrentActionList((prev) => [...prev, actionData]);
+  });
+
+  // Initialize hand from database on component mount (ensures parity)
+  React.useEffect(() => {
+    if (hand.length === 0 && data.peopleDatabase.length > 0) {
+      setHand(data.peopleDatabase.slice(0, MAX_HAND_SIZE));
+    }
+  }, [data.peopleDatabase, hand.length]);
+
+  const generateAndAddPerson = () => {
+    const person = generateRandomPerson();
+    setData((prev) => ({
+      ...prev,
+      peopleDatabase: [...prev.peopleDatabase, person],
+    }));
+    return person;
   };
 
-  const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
+  const pushAction = (action: string, involvedPersonIds: number[] = []) => {
+    const actionLog: ActionLog = {
+      actionIndex: data.actionLog.length,
+      action,
+      involvedPersonIds: involvedPersonIds.length > 0 ? involvedPersonIds : undefined,
+      timestamp: now(),
+    };
+
+    setData((prev) => ({
+      ...prev,
+      actionLog: [...prev.actionLog, actionLog],
+    }));
+  };
+
+  const findHoveredSlot = (info: any) => {
+    const slots = [
+      { ref: slot1Ref, currentSlot: matchSlot1, slotNumber: 1 },
+      { ref: slot2Ref, currentSlot: matchSlot2, slotNumber: 2 },
+    ];
+
+    for (const { ref, currentSlot, slotNumber } of slots) {
+      const element = ref.current;
+      if (element && !currentSlot) {
+        const rect = element.getBoundingClientRect();
+        if (
+          info.point.x >= rect.left &&
+          info.point.x <= rect.right &&
+          info.point.y >= rect.top &&
+          info.point.y <= rect.bottom
+        ) {
+          return slotNumber as 1 | 2;
+        }
+      }
+    }
+    return null;
+  };
 
   const handleCardDragEnd = (person: Person, info: any) => {
     setDragOverSlot(null);
 
-    const slot1Element = slot1Ref.current;
-    const slot2Element = slot2Ref.current;
+    const hoveredSlot = findHoveredSlot(info);
+    if (hoveredSlot) {
+      const slotConfig = {
+        1: { setter: setMatchSlot1, action: ACTIONS.PLACE_SLOT1 },
+        2: { setter: setMatchSlot2, action: ACTIONS.PLACE_SLOT2 },
+      }[hoveredSlot];
 
-    if (slot1Element) {
-      const rect1 = slot1Element.getBoundingClientRect();
-      if (
-        info.point.x >= rect1.left &&
-        info.point.x <= rect1.right &&
-        info.point.y >= rect1.top &&
-        info.point.y <= rect1.bottom &&
-        !matchSlot1
-      ) {
-        pushAction('PLACE_SLOT1', person.id);
-        setMatchSlot1(person);
-        // Remove from hand immediately without animation
-        setHand((prev) => prev.filter((p) => p.id !== person.id));
-        return;
-      }
-    }
-
-    if (slot2Element) {
-      const rect2 = slot2Element.getBoundingClientRect();
-      if (
-        info.point.x >= rect2.left &&
-        info.point.x <= rect2.right &&
-        info.point.y >= rect2.top &&
-        info.point.y <= rect2.bottom &&
-        !matchSlot2
-      ) {
-        pushAction('PLACE_SLOT2', person.id);
-        setMatchSlot2(person);
-        // Remove from hand immediately without animation
-        setHand((prev) => prev.filter((p) => p.id !== person.id));
-        return;
-      }
+      pushAction(slotConfig.action, [person.id]);
+      slotConfig.setter(person);
+      setHand((prev) => prev.filter((p) => p.id !== person.id));
     }
   };
 
-  const handleCardDrag = (person: Person, info: any) => {
-    // Check which slot we're hovering over for visual feedback
-    const slot1Element = slot1Ref.current;
-    const slot2Element = slot2Ref.current;
-
-    let newDragOverSlot: 1 | 2 | null = null;
-
-    if (slot1Element && !matchSlot1) {
-      const rect1 = slot1Element.getBoundingClientRect();
-      if (
-        info.point.x >= rect1.left &&
-        info.point.x <= rect1.right &&
-        info.point.y >= rect1.top &&
-        info.point.y <= rect1.bottom
-      ) {
-        newDragOverSlot = 1;
-      }
-    }
-
-    if (slot2Element && !matchSlot2) {
-      const rect2 = slot2Element.getBoundingClientRect();
-      if (
-        info.point.x >= rect2.left &&
-        info.point.x <= rect2.right &&
-        info.point.y >= rect2.top &&
-        info.point.y <= rect2.bottom
-      ) {
-        newDragOverSlot = 2;
-      }
-    }
-
-    setDragOverSlot(newDragOverSlot);
-  };
 
   const handleExchangePerson = (personId: number) => {
     if (roundOver) return;
-    pushAction('EXCHANGE', personId);
-    const newPerson = generateRandomPerson();
-    // Mark new person for animation
-    setNewCardIds((prev) => new Set([...prev, newPerson.id]));
-    // Remove old card and add new card to the right end
+
+    const newPerson = generateAndAddPerson();
+
+    pushAction(ACTIONS.EXCHANGE_PERSON, [personId, newPerson.id]);
+
     setHand((prev) => [...prev.filter((p) => p.id !== personId), newPerson]);
-    // Clear new card status after animation
-    setTimeout(() => {
-      setNewCardIds((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(newPerson.id);
-        return newSet;
-      });
-    }, 500);
   };
 
   const handleGenerateNew = () => {
     if (roundOver) return;
-    pushAction('GENERATE_NEW');
 
-    // Calculate how many cards are in the matching slots
     const cardsInSlots = (matchSlot1 ? 1 : 0) + (matchSlot2 ? 1 : 0);
     const newHandSize = MAX_HAND_SIZE - cardsInSlots;
 
-    // Clear any ongoing new card animations first
-    setNewCardIds(new Set());
+    const newHand = Array.from({ length: newHandSize }, () => generateAndAddPerson());
 
-    // First clear current hand - use immediate replacement instead of clearing
-    const newHand = Array.from({ length: newHandSize }, () => generateRandomPerson());
-    setNewCardIds(new Set(newHand.map((p) => p.id)));
+    pushAction(
+      ACTIONS.GENERATE_NEW,
+      newHand.map((p) => p.id),
+    );
+
     setHand(newHand);
-
-    // Clear new card status after animation
-    setTimeout(() => {
-      setNewCardIds(new Set());
-    }, 500);
   };
 
   const handleMatch = () => {
     if (roundOver || !matchSlot1 || !matchSlot2) return;
 
-    pushAction('MATCH');
     const matchScore = judgeCouple(matchSlot1, matchSlot2);
+    const matchTime = now();
     const newCouple: Couple = {
       person1: matchSlot1,
       person2: matchSlot2,
-      matchTime: now(),
+      matchTime,
       matchScore,
     };
 
+    const matchRecord: MatchRecord = {
+      matchIndex: data.matchDatabase.length,
+      partner1: matchSlot1,
+      partner2: matchSlot2,
+      timestamp: matchTime,
+      assignedScore: matchScore,
+    };
+
     setCouples((prev) => [...prev, newCouple]);
+    setData((prev) => ({
+      ...prev,
+      matchDatabase: [...prev.matchDatabase, matchRecord],
+    }));
 
-    // Update data
-    setData((prev) => {
-      const updatedData = [...prev];
-      const currentRound = prev[prev.length - 1];
-      currentRound.matches.push({
-        matchIndex: currentRound.matches.length,
-        person1: matchSlot1,
-        person2: matchSlot2,
-        matchTime: now(),
-        actions: currentActionList,
-      });
-      return updatedData;
-    });
+    pushAction(ACTIONS.MATCH, [matchSlot1.id, matchSlot2.id]);
 
-    const newPerson1 = generateRandomPerson();
-    const newPerson2 = generateRandomPerson();
-    setNewCardIds((prev) => new Set([...prev, newPerson1.id, newPerson2.id]));
+    const newPerson1 = generateAndAddPerson();
+    const newPerson2 = generateAndAddPerson();
+
+    pushAction(ACTIONS.ADD_TO_HAND, [newPerson1.id, newPerson2.id]);
+
     setHand((prev) => {
       const newHand = [...prev, newPerson1, newPerson2];
-      return newHand.slice(0, MAX_HAND_SIZE); // Limit to max hand size
+      return newHand.slice(0, MAX_HAND_SIZE); // just to be sure, should only ever be MAX_HAND_SIZE
     });
-
-    // Clear new card status after animation
-    setTimeout(() => {
-      setNewCardIds((prev) => {
-        const newSet = new Set(prev);
-        newSet.delete(newPerson1.id);
-        newSet.delete(newPerson2.id);
-        return newSet;
-      });
-    }, 500);
 
     setMatchSlot1(null);
     setMatchSlot2(null);
-    setCurrentActionList([]);
   };
 
   const handleClearSlots = () => {
     if (roundOver) return;
-    pushAction('CLEAR_SLOTS');
 
-    if (matchSlot1) {
-      setHand((prev) => [...prev, matchSlot1]);
-      setMatchSlot1(null);
-    }
-    if (matchSlot2) {
-      setHand((prev) => [...prev, matchSlot2]);
-      setMatchSlot2(null);
+    const slots = [
+      { person: matchSlot1, setter: setMatchSlot1 },
+      { person: matchSlot2, setter: setMatchSlot2 },
+    ];
+
+    const returningIds: number[] = [];
+
+    slots.forEach(({ person, setter }) => {
+      if (person) {
+        returningIds.push(person.id);
+        setHand((prev) => [...prev, person]);
+        setter(null);
+      }
+    });
+
+    if (returningIds.length > 0) {
+      pushAction(ACTIONS.CLEAR_SLOTS, returningIds);
     }
   };
 
   const handleNext = () => {
-    const finalData = [...data];
-    const currentRound = finalData[finalData.length - 1];
-    currentRound.matches.push({
-      matchIndex: currentRound.matches.length,
-      person1: null,
-      person2: null,
-      matchTime: null,
-      actions: currentActionList,
-    });
-
-    next({ datingData: finalData, completed: true });
+    pushAction(ACTIONS.GAME_END);
+    next({ datingData: data });
   };
 
-  // Timer countdown
-  useEffect(() => {
-    if (roundOver || timeLeft <= 0) return;
 
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        const newTime = prev - 1;
-        if (newTime <= 0) {
-          setRoundOver(true);
-          return 0;
-        }
-        return newTime;
-      });
-    }, 1000);
+  const handleSlotTap = useMemo(
+    () => (slotNumber: 1 | 2, e: Event) => {
+      if (isEnlargeAreaClick(e)) return; // fix due to wonky propagation of onClick for motion.dev onTap
 
-    return () => clearInterval(timer);
-  }, [roundOver, timeLeft]);
+      const slotConfig = {
+        1: { person: matchSlot1, setter: setMatchSlot1, action: ACTIONS.REMOVE_SLOT1 },
+        2: { person: matchSlot2, setter: setMatchSlot2, action: ACTIONS.REMOVE_SLOT2 },
+      }[slotNumber];
+
+      if (slotConfig.person) {
+        pushAction(slotConfig.action, [slotConfig.person.id]);
+        setHand((prev) => [...prev, slotConfig.person!]);
+        slotConfig.setter(null);
+      }
+    },
+    [matchSlot1, matchSlot2],
+  );
 
   return (
     <div className='min-h-screen w-full pt-10 bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] flex flex-col overflow-hidden'>
-      {/* Hidden News Ticker - just for logic */}
-      <div className="hidden">
-        <NewsTicker couples={couples} onTextChange={setNewsText} />
-      </div>
-
-      {/* Main Section - Timer, Matching Area, and Recent Matches */}
+      {/* Upper Section - Timer, Matching Area, and Recent Matches */}
       <div className='p-2 flex mt-8'>
         {/* Left Side - Timer */}
         <div className='w-56 flex flex-col items-center'>
-          <Timer timeLeft={timeLeft} />
+          <Timer timelimit={timelimit || 300} roundOver={roundOver} onEnd={() => setRoundOver(true)} />
           <ControlButton
             onClick={() => {
-              pushAction('HELP');
+              pushAction(ACTIONS.HELP);
               setShowHelp(true);
             }}
             className='px-6 py-3 text-sm mt-4'
@@ -758,15 +700,7 @@ export const DatingGame = ({ next, timelimit }: DatingGameProps) => {
                 person={matchSlot1}
                 isHighlighted={dragOverSlot === 1}
                 onEnlarge={setEnlargedPerson}
-                onTap={(e) => {
-                  if (isEnlargeAreaClick(e)) return;
-
-                  if (matchSlot1) {
-                    pushAction('REMOVE_SLOT1', matchSlot1.id);
-                    setHand((prev) => [...prev, matchSlot1]);
-                    setMatchSlot1(null);
-                  }
-                }}
+                onTap={(e) => handleSlotTap(1, e)}
               />
 
               <div className='text-4xl'>💕</div>
@@ -776,15 +710,7 @@ export const DatingGame = ({ next, timelimit }: DatingGameProps) => {
                 person={matchSlot2}
                 isHighlighted={dragOverSlot === 2}
                 onEnlarge={setEnlargedPerson}
-                onTap={(e) => {
-                  if (isEnlargeAreaClick(e)) return;
-
-                  if (matchSlot2) {
-                    pushAction('REMOVE_SLOT2', matchSlot2.id);
-                    setHand((prev) => [...prev, matchSlot2]);
-                    setMatchSlot2(null);
-                  }
-                }}
+                onTap={(e) => handleSlotTap(2, e)}
               />
             </div>
 
@@ -824,9 +750,9 @@ export const DatingGame = ({ next, timelimit }: DatingGameProps) => {
           <div className='flex flex-col gap-2 max-h-96 overflow-visible'>
             <AnimatePresence mode='popLayout'>
               {couples
-                .slice(-5)
+                .slice(-MAX_RECENT_COUPLES)
                 .reverse()
-                .map((couple, index) => (
+                .map((couple) => (
                   <motion.div
                     key={couple.matchTime}
                     className='flex items-center gap-2'
@@ -858,22 +784,12 @@ export const DatingGame = ({ next, timelimit }: DatingGameProps) => {
             </AnimatePresence>
           </div>
 
-          {/* News ticker text below recent matches */}
-          {couples.length > 0 && (
-            <div className='w-full mt-8'>
-              <div className='bg-white border-2 border-black p-3 w-40 h-24 flex items-start overflow-hidden shadow-[4px_4px_0px_rgba(0,0,0,1)]'>
-                <span className='text-sm font-medium leading-tight'>
-                  {newsText}
-                </span>
-              </div>
-            </div>
-          )}
+          {!roundOver && couples.length > 0 && <NewsTicker couples={couples} />}
         </div>
       </div>
 
       {/* Bottom Section - Hand */}
       <div className='flex mt-5 justify-center'>
-        {/* Hand - Centered */}
         <motion.div
           className='flex gap-3 justify-center'
           layout
@@ -884,11 +800,10 @@ export const DatingGame = ({ next, timelimit }: DatingGameProps) => {
               <AnimatedPersonCard
                 key={person.id}
                 person={person}
-                isNew={newCardIds.has(person.id)}
                 onDismiss={() => handleExchangePerson(person.id)}
                 onEnlarge={() => setEnlargedPerson(person)}
                 onDragEnd={handleCardDragEnd}
-                onDrag={handleCardDrag}
+                onDrag={(_, info) => setDragOverSlot(findHoveredSlot(info))}
                 roundOver={roundOver}
               />
             ))}

@@ -1,4 +1,4 @@
-import { MALE_NAMES, FEMALE_NAMES, TRAIT_DISPLAY_WORDS, MISC_DISPLAY_WORDS } from './datinggamelist';
+import { MALE_NAMES, FEMALE_NAMES, TRAIT_DISPLAY_WORDS, MISC_DISPLAY_WORDS, COUPLE_MESSAGES } from './datinggamelist';
 
 // Core personality scales (0-10, 5 is average)
 export interface CoreTraits {
@@ -216,4 +216,34 @@ export const judgeCouple = (person1: Person, person2: Person): number => {
   score += miscScore;
 
   return Math.round(Math.max(0, Math.min(100, score)));
+};
+
+// News message generation for couples
+export const generateNewsMessage = (couples: { person1: Person; person2: Person; matchScore: number }[], maxRecentCouples: number = 5): string => {
+  if (couples.length === 0) {
+    return '';
+  }
+
+  // Only use the last few couples (most recent)
+  const recentCouples = couples.slice(-maxRecentCouples);
+  const randomCouple = recentCouples[Math.floor(Math.random() * recentCouples.length)];
+  const score = randomCouple.matchScore;
+
+  // Add noise to score for message selection (even good couples have awkward moments)
+  const noisyScore = score + (Math.random() - 0.5) * 30; // +-15 points of noise
+
+  let messageCategory: 'veryPositive' | 'positive' | 'neutral' | 'negative' | 'veryNegative';
+  if (noisyScore >= 80) messageCategory = 'veryPositive';
+  else if (noisyScore >= 60) messageCategory = 'positive';
+  else if (noisyScore >= 40) messageCategory = 'neutral';
+  else if (noisyScore >= 20) messageCategory = 'negative';
+  else messageCategory = 'veryNegative';
+
+  const messages = COUPLE_MESSAGES[messageCategory];
+  const template = messages[Math.floor(Math.random() * messages.length)];
+
+  // Replace placeholders with actual names
+  return template
+    .replace(/{person1}/g, randomCouple.person1.name)
+    .replace(/{person2}/g, randomCouple.person2.name);
 };
