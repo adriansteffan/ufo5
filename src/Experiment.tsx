@@ -19,6 +19,15 @@ import {
   WheelOfFortune,
 } from './components';
 
+import {
+  flattenTaskRankingData,
+  flattenTaskRatingData,
+  flattenWordGameData,
+  flattenNumberGameData,
+  flattenSportsGameData,
+  flattenDatingGameData,
+} from './utils/dataFlatteners';
+
 registerArrayExtensions();
 
 const config: ExperimentConfig = { showProgressBar: false };
@@ -75,14 +84,77 @@ const USE_SIMPLIFIED_RANKING = getParam(
   'Use simplified drag-and-drop ranking instead of 1-10 rating system',
 );
 
-// TODO: create a decent flattener
 const flatteners = {
   TaskRanking: (item: TrialData) => {
     const { index, trialNumber, start, end, duration, type, name } = item;
-    const { rankings } = item.responseData;
+    const flattenedData = flattenTaskRankingData(item.responseData);
 
-    return [
-      {
+    return flattenedData.map(data => ({
+      trialIndex: index,
+      trialNumber,
+      trialStart: start,
+      trialEnd: end,
+      trialDuration: duration,
+      trialType: type,
+      trialName: name,
+      ...data,
+    }));
+  },
+
+  TaskRating: (item: TrialData) => {
+    const { index, trialNumber, start, end, duration, type, name } = item;
+    const flattenedData = flattenTaskRatingData(item.responseData);
+
+    return flattenedData.map(data => ({
+      trialIndex: index,
+      trialNumber,
+      trialStart: start,
+      trialEnd: end,
+      trialDuration: duration,
+      trialType: type,
+      trialName: name,
+      ...data,
+    }));
+  },
+
+  WordGame: (item: TrialData) => {
+    const { index, trialNumber, start, end, duration, type, name } = item;
+    const flattenedActions = flattenWordGameData(item.responseData);
+
+    return flattenedActions.map(action => ({
+      trialIndex: index,
+      trialNumber,
+      trialStart: start,
+      trialEnd: end,
+      trialDuration: duration,
+      trialType: type,
+      trialName: name,
+      ...action,
+    }));
+  },
+
+  NumberGame: (item: TrialData) => {
+    const { index, trialNumber, start, end, duration, type, name } = item;
+    const flattenedActions = flattenNumberGameData(item.responseData);
+
+    return flattenedActions.map(action => ({
+      trialIndex: index,
+      trialNumber,
+      trialStart: start,
+      trialEnd: end,
+      trialDuration: duration,
+      trialType: type,
+      trialName: name,
+      ...action,
+    }));
+  },
+
+  SportsGame: (item: TrialData) => {
+    const { index, trialNumber, start, end, duration, type, name } = item;
+    const { actions, playerDatabase, matchDatabase } = flattenSportsGameData(item.responseData);
+
+    return {
+      actions: actions.map(action => ({
         trialIndex: index,
         trialNumber,
         trialStart: start,
@@ -90,9 +162,71 @@ const flatteners = {
         trialDuration: duration,
         trialType: type,
         trialName: name,
-        rankings: rankings ? JSON.stringify(rankings) : '',
-      },
-    ];
+        ...action,
+      })),
+
+      playerDatabase: playerDatabase.map(player => ({
+        trialIndex: index,
+        trialNumber,
+        trialStart: start,
+        trialEnd: end,
+        trialDuration: duration,
+        trialType: type,
+        trialName: name,
+        ...player,
+      })),
+
+      matchDatabase: matchDatabase.map(match => ({
+        trialIndex: index,
+        trialNumber,
+        trialStart: start,
+        trialEnd: end,
+        trialDuration: duration,
+        trialType: type,
+        trialName: name,
+        ...match,
+      })),
+    };
+  },
+
+  DatingGame: (item: TrialData) => {
+    const { index, trialNumber, start, end, duration, type, name } = item;
+    const { actions, matchDatabase, peopleDatabase } = flattenDatingGameData(item.responseData);
+
+    return {
+      actions: actions.map(action => ({
+        trialIndex: index,
+        trialNumber,
+        trialStart: start,
+        trialEnd: end,
+        trialDuration: duration,
+        trialType: type,
+        trialName: name,
+        ...action,
+      })),
+
+      matchDatabase: matchDatabase.map(match => ({
+        trialIndex: index,
+        trialNumber,
+        trialStart: start,
+        trialEnd: end,
+        trialDuration: duration,
+        trialType: type,
+        trialName: name,
+        ...match,
+      })),
+
+      peopleDatabase: peopleDatabase.map(person => ({
+        trialIndex: index,
+        trialNumber,
+        trialStart: start,
+        trialEnd: end,
+        trialDuration: duration,
+        trialType: type,
+        trialName: name,
+        ...person,
+      })),
+    };
   },
 };
 
@@ -661,7 +795,10 @@ const experiment = subsetExperimentByParam([
         filename: '',
         trials: ['CheckDevice'],
         fun: (sessionInfo: Record<string, any>) => {
-          return sessionInfo;
+          return {
+            ...sessionInfo,
+            group: PARTICIPANT_GROUP,
+          };
         },
       },
       trialCSVBuilder: {
@@ -676,14 +813,28 @@ const experiment = subsetExperimentByParam([
             trials: ['TaskRanking'],
           },
           {
-            filename: `_TASK_TRIALS_${Date.now()}`,
-            trials: [
-              'WordGameTrial',
-              'NumberGameTrial',
-              'DatingGame',
-              'SportsGame',
-              'ElementsGame',
-            ],
+            filename: `_TASK_RATING_${Date.now()}`,
+            trials: ['TaskRating'],
+          },
+          {
+            filename: `_WORDGAME_${Date.now()}`,
+            trials: ['WordGameTrial'],
+          },
+          {
+            filename: `_NUMBERGAME_${Date.now()}`,
+            trials: ['NumberGameTrial'],
+          },
+          {
+            filename: `_SPORTSGAME_${Date.now()}`,
+            trials: ['SportsGame'],
+          },
+          {
+            filename: `_DATINGGAME_${Date.now()}`,
+            trials: ['DatingGame'],
+          },
+          {
+            filename: `_ELEMENTSGAME_${Date.now()}`,
+            trials: ['ElementsGame'],
           },
           {
             filename: `_EXIT_QUESTIONNAIRE_${Date.now()}`,

@@ -59,6 +59,7 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
   const [foundWords, setFoundWords] = useState<WordObj[]>([]);
   const [roundOver, setRoundOver] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
+  const submittingRef = useRef(false);
 
   const wordsContainerRef = useRef<HTMLDivElement>(null);
 
@@ -148,8 +149,12 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
   const handleSubmitWord = () => {
     if (roundOver) return;
     if (currentWord.length === 0) return;
+    if (submittingRef.current) return;
+
+    submittingRef.current = true;
 
     if (foundWords.some((w) => w.word === currentWord)) {
+      submittingRef.current = false;
       toast('Word already found!', {
         position: 'top-center',
         transition: Bounce,
@@ -163,6 +168,7 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
       .every((letter) => currentLetterSet.letters.includes(letter));
 
     if (!canMakeWord) {
+      submittingRef.current = false;
       toast('Word uses letters not available!', {
         position: 'top-center',
         transition: Bounce,
@@ -182,16 +188,21 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
 
     setData((prev) => {
       const updatedData = [...prev];
-      const currentRound = prev[prev.length - 1];
+      const currentRound = {
+        ...prev[prev.length - 1],
+        found: [...prev[prev.length - 1].found]
+      };
       currentRound.found.push({
         foundWordIndex: currentRound.found.length,
-        actions: currentActionList,
+        actions: [...currentActionList],
         ...wordData,
       });
+      updatedData[updatedData.length - 1] = currentRound;
       return updatedData;
     });
 
     setCurrentActionList([]);
+    submittingRef.current = false;
   };
 
   const handleShuffleLetters = () => {

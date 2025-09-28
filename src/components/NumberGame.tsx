@@ -58,6 +58,7 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
   const [roundOver, setRoundOver] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [expectingOperator, setExpectingOperator] = useState(false);
+  const submittingRef = useRef(false);
 
   const expressionsContainerRef = useRef<HTMLDivElement>(null);
   const formulaDisplayRef = useRef<HTMLDivElement>(null);
@@ -242,10 +243,14 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
     if (roundOver) return;
     if (currentExpression.length === 0) return;
     if (!expectingOperator) return; // Can only submit after a number
+    if (submittingRef.current) return;
+
+    submittingRef.current = true;
 
     const result = evaluateExpression(currentExpression);
 
     if (result !== currentNumberSet.target) {
+      submittingRef.current = false;
       toast('Calculation must equal the target!', {
         position: 'top-center',
         transition: Bounce,
@@ -255,6 +260,7 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
     }
 
     if (foundExpressions.some((expr) => expr.expression === currentExpression)) {
+      submittingRef.current = false;
       toast('You already found this way of solving it!', {
         position: 'top-center',
         transition: Bounce,
@@ -275,16 +281,21 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
 
     setData((prev) => {
       const updatedData = [...prev];
-      const currentRound = prev[prev.length - 1];
+      const currentRound = {
+        ...prev[prev.length - 1],
+        found: [...prev[prev.length - 1].found]
+      };
       currentRound.found.push({
         foundExpressionIndex: currentRound.found.length,
-        actions: currentActionList,
+        actions: [...currentActionList],
         ...expressionData,
       });
+      updatedData[updatedData.length - 1] = currentRound;
       return updatedData;
     });
 
     setCurrentActionList([]);
+    submittingRef.current = false;
   };
 
   const handleNewNumberSet = () => {

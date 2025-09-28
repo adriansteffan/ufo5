@@ -49,17 +49,48 @@ interface RoundData {
   endTime?: number;
 }
 
+interface MatchRecord {
+  matchIndex: number;
+  roundIndex: number;
+
+  defenseA_playerId: number | null;
+  midA1_playerId: number | null;
+  midA2_playerId: number | null;
+  offenseA_playerId: number | null;
+  offenseB_playerId: number | null;
+  midB1_playerId: number | null;
+  midB2_playerId: number | null;
+  defenseB_playerId: number | null;
+
+  defenseA_fitness: number;
+  midA1_fitness: number;
+  midA2_fitness: number;
+  offenseA_fitness: number;
+  offenseB_fitness: number;
+  midB1_fitness: number;
+  midB2_fitness: number;
+  defenseB_fitness: number;
+
+  teamAFitness: number;
+  teamBFitness: number;
+
+  teamAScore: number;
+  teamBScore: number;
+  winner: 'A' | 'B' | 'tie';
+
+  timestamp: number;
+}
+
 type SportsGameData = {
   playerDatabase: Player[];
   rounds: RoundData[];
+  matchDatabase: MatchRecord[];
   starttime: number;
 };
 
 const MAX_INITIAL_HAND = 5;
 const MAX_HAND_SIZE = 6;
 
-// generator to have a closured id counter
-const generateRandomPlayer = createPlayerGenerator();
 
 const TEAM_POSITIONS = {
   offenseA: { positionClass: 'right-0 top-1/2 transform -translate-y-1/2', emptyLabel: 'ATT' },
@@ -572,6 +603,9 @@ export const SportsGame = ({
 }: BaseComponentProps & {
   timelimit?: number;
 }) => {
+  // generator to have a closured id counter
+  const generateRandomPlayer = useMemo(() => createPlayerGenerator(), []);
+
   const [gameState, setGameState] = useState<GameState>('setup');
   const [currentModal, setCurrentModal] = useState<ModalState>(null);
   const [dragOverSlot, setDragOverSlot] = useState<TeamPosition | null>(null);
@@ -597,6 +631,7 @@ export const SportsGame = ({
     return {
       playerDatabase: [...initialHand],
       rounds: [],
+      matchDatabase: [],
       starttime: now(),
     };
   });
@@ -789,6 +824,38 @@ export const SportsGame = ({
       Object.values(teamSetup).map((p) => p!.id),
     );
 
+    const matchRecord: MatchRecord = {
+      matchIndex: data.matchDatabase.length,
+      roundIndex: data.rounds.length,
+
+      defenseA_playerId: teamSetup.defenseA?.id || null,
+      midA1_playerId: teamSetup.midA1?.id || null,
+      midA2_playerId: teamSetup.midA2?.id || null,
+      offenseA_playerId: teamSetup.offenseA?.id || null,
+      offenseB_playerId: teamSetup.offenseB?.id || null,
+      midB1_playerId: teamSetup.midB1?.id || null,
+      midB2_playerId: teamSetup.midB2?.id || null,
+      defenseB_playerId: teamSetup.defenseB?.id || null,
+
+      defenseA_fitness: teamSetup.defenseA ? teamSetup.defenseA.stats.defense * 2 + teamSetup.defenseA.stats.stamina : 0,
+      midA1_fitness: teamSetup.midA1 ? teamSetup.midA1.stats.passing * 2 + teamSetup.midA1.stats.stamina : 0,
+      midA2_fitness: teamSetup.midA2 ? teamSetup.midA2.stats.passing * 2 + teamSetup.midA2.stats.stamina : 0,
+      offenseA_fitness: teamSetup.offenseA ? teamSetup.offenseA.stats.shooting * 2 + teamSetup.offenseA.stats.stamina : 0,
+      offenseB_fitness: teamSetup.offenseB ? teamSetup.offenseB.stats.shooting * 2 + teamSetup.offenseB.stats.stamina : 0,
+      midB1_fitness: teamSetup.midB1 ? teamSetup.midB1.stats.passing * 2 + teamSetup.midB1.stats.stamina : 0,
+      midB2_fitness: teamSetup.midB2 ? teamSetup.midB2.stats.passing * 2 + teamSetup.midB2.stats.stamina : 0,
+      defenseB_fitness: teamSetup.defenseB ? teamSetup.defenseB.stats.defense * 2 + teamSetup.defenseB.stats.stamina : 0,
+
+      teamAFitness: result.teamAFitness,
+      teamBFitness: result.teamBFitness,
+
+      teamAScore: result.teamAScore,
+      teamBScore: result.teamBScore,
+      winner: result.winner,
+
+      timestamp: now(),
+    };
+
     const roundData: RoundData = {
       roundIndex: data.rounds.length,
       teamSetup: { ...teamSetup },
@@ -808,6 +875,7 @@ export const SportsGame = ({
     setData((prev) => ({
       ...prev,
       rounds: [...prev.rounds, roundData],
+      matchDatabase: [...prev.matchDatabase, matchRecord],
     }));
 
     setCurrentActionLog([]);

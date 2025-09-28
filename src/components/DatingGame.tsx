@@ -59,8 +59,6 @@ const MAX_HAND_SIZE = 5;
 const MAX_RECENT_COUPLES = 5;
 const NEWS_TICKER_ANIMATION_SPEED_MS = 80;
 
-const generateRandomPerson = createPersonGenerator();
-
 const NewsTicker = React.memo(({ couples }: { couples: Couple[] }) => {
   const [displayText, setDisplayText] = useState('');
   const couplesRef = useRef(couples);
@@ -429,6 +427,9 @@ export const DatingGame = ({
 }: {
   timelimit: number;
 } & BaseComponentProps) => {
+  // generator to have a closured id counter
+  const generateRandomPerson = useMemo(() => createPersonGenerator(), []);
+
   const slot1Ref = useRef<HTMLDivElement>(null);
   const slot2Ref = useRef<HTMLDivElement>(null);
 
