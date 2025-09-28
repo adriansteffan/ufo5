@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState, useMemo } from 'react';
 import { BaseComponentProps, now } from '@adriansteffan/reactive';
 import { motion, AnimatePresence } from 'motion/react';
 import { CgSearch } from 'react-icons/cg';
+import { HelpModal } from './HelpModal';
+import { Timer } from './Timer';
 import {
   createPersonGenerator,
   judgeCouple,
@@ -135,38 +137,6 @@ const NewsTicker = React.memo(({ couples }: { couples: Couple[] }) => {
   );
 });
 
-const Timer = React.memo(({ timelimit, roundOver, onEnd }: {
-  timelimit: number;
-  roundOver: boolean;
-  onEnd: () => void;
-}) => {
-  const [timeLeft, setTimeLeft] = useState(timelimit);
-
-  useEffect(() => {
-    if (roundOver || timeLeft <= 0) return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        const newTime = prev - 1;
-        if (newTime <= 0) {
-          onEnd();
-          return 0;
-        }
-        return newTime;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [roundOver, timeLeft, onEnd]);
-
-  return (
-    <div className='p-2 pt-4 flex justify-center'>
-      <div className='text-2xl font-bold text-center'>
-        {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-      </div>
-    </div>
-  );
-});
 
 const EnlargedCardModal = React.memo(
   ({ person, onClose }: { person: Person; onClose: () => void }) => {
@@ -812,67 +782,32 @@ export const DatingGame = ({
       </div>
 
       {/* Help Modal */}
-      <AnimatePresence>
-        {showHelp && (
-          <motion.div
-            className='fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50'
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            onClick={() => setShowHelp(false)}
-          >
-            <motion.div
-              className='bg-white border-4 border-black rounded-lg shadow-[5px_5px_0px_rgba(0,0,0,1)] p-6 max-w-md mx-4'
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className='flex justify-between items-center mb-4'>
-                <h2 className='text-xl font-bold'>How to Play</h2>
-                <button
-                  onClick={() => setShowHelp(false)}
-                  className='w-8 h-8 rounded-full bg-red-300 border-2 border-black flex items-center justify-center font-bold text-lg hover:bg-red-400 leading-none'
-                >
-                  ×
-                </button>
-              </div>
+      <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)}>
+        <div className='space-y-4'>
+          <div>
+            <h3 className='font-bold mb-2'>Goal:</h3>
+            <p className='text-sm'>
+              Match compatible people by dragging them into the matching slots and creating
+              couples before time runs out!
+            </p>
+          </div>
 
-              <div className='space-y-4'>
-                <div>
-                  <h3 className='font-bold mb-2'>Goal:</h3>
-                  <p className='text-sm'>
-                    Match compatible people by dragging them into the matching slots and creating
-                    couples before time runs out!
-                  </p>
-                </div>
-
-                <div>
-                  <h3 className='font-bold mb-2'>Controls:</h3>
-                  <ul className='text-sm space-y-1 list-disc list-outside pl-4'>
-                    <li>Drag people from your hand to the matching slots</li>
-                    <li>Click "MATCH" to create a blind date from the two slots</li>
-                    <li>Click the red ✕ to send a person home an get a new one</li>
-                    <li>Click the profile picture to view a person in detail</li>
-                    <li>Use "NEW HAND" to replace your whole hand people</li>
-                    <li>
-                      Clicking on cards in the slots will return them to your hand, "CLEAR" will
-                      return both
-                    </li>
-                  </ul>
-                </div>
-              </div>
-
-              <button
-                onClick={() => setShowHelp(false)}
-                className='w-full cursor-pointer bg-white px-4 py-2 border-2 border-black font-bold text-black rounded-lg shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all duration-150 mt-6'
-              >
-                Got it!
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+          <div>
+            <h3 className='font-bold mb-2'>Controls:</h3>
+            <ul className='text-sm space-y-1 list-disc list-outside pl-4'>
+              <li>Drag people from your hand to the matching slots</li>
+              <li>Click "MATCH" to create a blind date from the two slots</li>
+              <li>Click the red ✕ to send a person home an get a new one</li>
+              <li>Click the profile picture to view a person in detail</li>
+              <li>Use "NEW HAND" to replace your whole hand people</li>
+              <li>
+                Clicking on cards in the slots will return them to your hand, "CLEAR" will
+                return both
+              </li>
+            </ul>
+          </div>
+        </div>
+      </HelpModal>
 
       {enlargedPerson && (
         <EnlargedCardModal person={enlargedPerson} onClose={() => setEnlargedPerson(null)} />

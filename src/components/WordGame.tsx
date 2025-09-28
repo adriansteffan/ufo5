@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { LETTER_SETS } from '../utils/wordgamelist';
 import { BaseComponentProps, now, toast, Bounce } from '@adriansteffan/reactive';
-import { motion, AnimatePresence } from 'motion/react';
+import { HelpModal } from './HelpModal';
+import { Timer } from './Timer';
 
 interface WordObj {
   word: string;
@@ -56,7 +57,6 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
   const [currentActionList, setCurrentActionList] = useState<ActionData[]>([]);
   const [currentWord, setCurrentWord] = useState('');
   const [foundWords, setFoundWords] = useState<WordObj[]>([]);
-  const [timeLeft, setTimeLeft] = useState(timelimit);
   const [roundOver, setRoundOver] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
 
@@ -93,25 +93,6 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
       {children}
     </button>
   );
-
-  // Timer
-  useEffect(() => {
-    if (roundOver) return;
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => {
-        const newTime = Math.max(0, prev - 1);
-
-        if (newTime === 0 && !roundOver) {
-          setRoundOver(true);
-        }
-
-        return newTime;
-      });
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [roundOver]);
 
   // Scroll the words to the bottom as soon as a new one is added
   useEffect(() => {
@@ -265,9 +246,12 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
       <div className='p-4 pt-8 pb-10 lg:pt-24 max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 justify-center lg:min-h-screen'>
         {/* Left Side - Timer */}
         <div className='lg:w-56 lg:px-12 lg:p-4 flex flex-col items-center gap-4'>
-          <div className='text-2xl font-bold text-center'>
-            {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-          </div>
+          <Timer
+            timelimit={timelimit}
+            roundOver={roundOver}
+            onEnd={() => setRoundOver(true)}
+            className=''
+          />
 
           {/* CLEAR and NEW SET buttons in the horizontal layout */}
           {!roundOver && (
@@ -427,59 +411,24 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
         </div>
       </div>
 
-      {/* Help Popup */}
-      <AnimatePresence>
-        {showHelp && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className='fixed inset-0 bg-gray-900 bg-opacity-50 flex items-center justify-center z-50'
-            onClick={() => setShowHelp(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.8, opacity: 0 }}
-              className='bg-white border-4 border-black rounded-lg shadow-[5px_5px_0px_rgba(0,0,0,1)] p-6 max-w-md mx-4'
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className='flex items-center justify-between mb-4'>
-                <h3 className='text-xl font-bold'>How to Play</h3>
-                <button
-                  onClick={() => setShowHelp(false)}
-                  className='w-8 h-8 rounded-full bg-red-300 border-2 border-black flex items-center justify-center font-bold text-lg hover:bg-red-400 leading-none'
-                >
-                  ×
-                </button>
-              </div>
-              <div className='mb-4'>
-                <p className='mb-3'>
-                  <strong>Goal:</strong> Create as many valid words as possible using the given set
-                  of 7 letters.
-                </p>
-                <p className='mb-2'>
-                  <strong>Controls:</strong>
-                </p>
-                <ul className='text-sm space-y-1 mb-3 pl-4'>
-                  <li>• Click letter buttons to spell words</li>
-                  <li>• Press ENTER to submit a word</li>
-                  <li>• Press DELETE to remove last letter</li>
-                  <li>• Press SHUFFLE to change the order of the letter-buttons</li>
-                  <li>• Press CLEAR to delete the full current input</li>
-                  <li>• Press NEW SET for different letters</li>
-                </ul>
-              </div>
-              <button
-                onClick={() => setShowHelp(false)}
-                className='w-full cursor-pointer bg-white px-4 py-2 border-2 border-black font-bold text-black rounded-lg shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all duration-150'
-              >
-                Got it!
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Help Modal */}
+      <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)}>
+        <p className='mb-3'>
+          <strong>Goal:</strong> Create as many valid words as possible using the given set
+          of 7 letters.
+        </p>
+        <p className='mb-2'>
+          <strong>Controls:</strong>
+        </p>
+        <ul className='text-sm space-y-1 mb-3 pl-4'>
+          <li>• Click letter buttons to spell words</li>
+          <li>• Press ENTER to submit a word</li>
+          <li>• Press DELETE to remove last letter</li>
+          <li>• Press SHUFFLE to change the order of the letter-buttons</li>
+          <li>• Press CLEAR to delete the full current input</li>
+          <li>• Press NEW SET for different letters</li>
+        </ul>
+      </HelpModal>
     </div>
   );
 };

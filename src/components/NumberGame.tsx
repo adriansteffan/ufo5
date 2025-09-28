@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState, useMemo } from 'react';
 import { NUMBER_SETS } from '../utils/numbergamelist';
 import { BaseComponentProps, now, toast, Bounce } from '@adriansteffan/reactive';
-import { motion, AnimatePresence } from 'motion/react';
+import { HelpModal } from './HelpModal';
+import { Timer } from './Timer';
 
 interface ExpressionObj {
   expression: string;
@@ -54,7 +55,6 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
   const [currentActionList, setCurrentActionList] = useState<ActionData[]>([]);
   const [currentExpression, setCurrentExpression] = useState('');
   const [foundExpressions, setFoundExpressions] = useState<ExpressionObj[]>([]);
-  const [timeLeft, setTimeLeft] = useState(timelimit);
   const [roundOver, setRoundOver] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [expectingOperator, setExpectingOperator] = useState(false);
@@ -331,20 +331,6 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
     next({ numbersData: finalData, completed: true });
   };
 
-  // Timer countdown
-  useEffect(() => {
-    if (timeLeft <= 0) {
-      setRoundOver(true);
-      return;
-    }
-
-    const timer = setInterval(() => {
-      setTimeLeft((prev) => prev - 1);
-    }, 1000);
-
-    return () => clearInterval(timer);
-  }, [timeLeft]);
-
   // Auto-scroll formula display and expression collection
   useEffect(() => {
     if (expressionsContainerRef.current) {
@@ -379,9 +365,12 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
       <div className='p-4 pt-8 pb-10 lg:pt-24 max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 justify-center lg:min-h-screen'>
         {/* Left Side - Timer and Controls */}
         <div className='lg:w-56 lg:px-12 lg:p-4 flex flex-col items-center gap-4'>
-          <div className='text-2xl font-bold text-center'>
-            {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
-          </div>
+          <Timer
+            timelimit={timelimit}
+            roundOver={roundOver}
+            onEnd={() => setRoundOver(true)}
+            className=''
+          />
           {/* Control buttons */}
           {!roundOver && (
             <div className='hidden lg:flex flex-col gap-4 items-center'>
@@ -563,62 +552,27 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
         </div>
       </div>
 
-      {/* Help Popup */}
-      <AnimatePresence>
-        {showHelp && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            className='fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50'
-            onClick={() => setShowHelp(false)}
-          >
-            <motion.div
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.9, opacity: 0 }}
-              className='bg-white p-6 rounded-lg max-w-md border-4 border-black'
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className='flex items-center justify-between mb-4'>
-                <h3 className='text-xl font-bold'>How to Play</h3>
-                <button
-                  onClick={() => setShowHelp(false)}
-                  className='w-8 h-8 rounded-full bg-red-300 border-2 border-black flex items-center justify-center font-bold text-lg hover:bg-red-400 leading-none'
-                >
-                  ×
-                </button>
-              </div>
-              <div className='mb-4'>
-                <p className='mb-3'>
-                  <strong>Goal:</strong> Create mathematical expressions using the 4 given numbers
-                  and operators to reach the target number.
-                </p>
-                <p className='mb-2'>
-                  <strong>Rules:</strong>
-                </p>
-                <ul className='text-sm space-y-1 mb-3 pl-4'>
-                  <li>
-                    Create terms resulting in the target using the given numbers and operators
-                  </li>
-                  <li>• Operations are evaluated left to right, e.g. 5 + 5 x 7 = 70</li>
-                  <li>• Each number and operator can be used multiple times</li>
-                  <li>• Press ENTER to submit your solution</li>
-                  <li>• Press DELETE undo the last operation</li>
-                  <li>• Press CLEAR to delete the entire current solution</li>
-                  <li>• Press NEW SET for a new pair of numbers and target</li>
-                </ul>
-              </div>
-              <button
-                onClick={() => setShowHelp(false)}
-                className='w-full cursor-pointer bg-white px-4 py-2 border-2 border-black font-bold text-black rounded-lg shadow-[2px_2px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-none transition-all duration-150'
-              >
-                Got it!
-              </button>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
+      {/* Help Modal */}
+      <HelpModal isOpen={showHelp} onClose={() => setShowHelp(false)}>
+        <p className='mb-3'>
+          <strong>Goal:</strong> Create mathematical expressions using the 4 given numbers
+          and operators to reach the target number.
+        </p>
+        <p className='mb-2'>
+          <strong>Rules:</strong>
+        </p>
+        <ul className='text-sm space-y-1 mb-3 pl-4'>
+          <li>
+            Create terms resulting in the target using the given numbers and operators
+          </li>
+          <li>• Operations are evaluated left to right, e.g. 5 + 5 x 7 = 70</li>
+          <li>• Each number and operator can be used multiple times</li>
+          <li>• Press ENTER to submit your solution</li>
+          <li>• Press DELETE undo the last operation</li>
+          <li>• Press CLEAR to delete the entire current solution</li>
+          <li>• Press NEW SET for a new pair of numbers and target</li>
+        </ul>
+      </HelpModal>
 
       <style>{`
         @keyframes blink {

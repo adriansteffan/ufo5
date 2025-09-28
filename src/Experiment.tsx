@@ -301,7 +301,7 @@ const experiment = subsetExperimentByParam([
                 On this page you will find descriptions of the games we are testing out. Please read
                 through each one carefully before proceeding to the next step.
               </p>
-              <br/>
+              <br />
 
               {TASKS.map((task) => (
                 <section key={task}>
@@ -309,7 +309,7 @@ const experiment = subsetExperimentByParam([
                     <strong>{TASK_NAMES[task]}</strong>
                   </h3>
                   <p>{TASK_DESCRIPTIONS[task]}</p>
-                  <br/>
+                  <br />
                 </section>
               ))}
             </div>
@@ -511,8 +511,8 @@ const experiment = subsetExperimentByParam([
                 <li>Click the profile picture to view a person in detail</li>
                 <li>Use "NEW HAND" to replace your whole hand people</li>
                 <li>
-                  Clicking on cards in the slots will return them to your hand, "CLEAR" will
-                  return both
+                  Clicking on cards in the slots will return them to your hand, "CLEAR" will return
+                  both
                 </li>
               </ul>
             </div>
@@ -548,15 +548,25 @@ const experiment = subsetExperimentByParam([
               <p>
                 Let's play a round of {TASK_NAMES['SportsGame']}! In this management sandbox, you
                 will be presented with cards of virtual football players, each having different
-                strenghts and weaknesses. Your task is to create teams and have them play each other
-                by assigning players of both teams to positions "Attack", "Defense", and "Middle".
-                Feel free to experiment with multiple matches within the time limit of 4 minutes.
+                strengths and weaknesses. Your task is to create two teams and have them
+                play matches by assigning players to positions: Attack (ATT), Defense (DEF), and Mid
+                (MID). Keep in mind that certain players have a better time in certain positions.
+                You have 4 minutes to spend in this game overall, so gave fun setting up different
+                matches!
               </p>
               <p>
                 <strong>How to play:</strong>
               </p>
               <ul className='pl-5 mb-4'>
-                <li>Drag a player card to do X</li>
+                <li>
+                  Use DRAFT to add new players to your hand for a selection of up to 6 at a time
+                </li>
+                <li>Drag players from your hand to team positions on the field to assign them</li>
+                <li>You can drag players between positions to swap them</li>
+                <li>Click START MATCH when the positions of both team are filled</li>
+                <li>Drag players from positions to an area with no slots</li>
+                <li>Click ✕ on hand cards to discard unwanted players</li>
+                <li>Use CLEAR to return field players to hand</li>
               </ul>
             </div>
           ),
@@ -566,7 +576,7 @@ const experiment = subsetExperimentByParam([
         name: 'SportsGame',
         type: 'SportsGame',
         props: {
-          // Sports Game specific props
+          timelimit: TASK_TIME_LIMIT,
         },
       },
     ],

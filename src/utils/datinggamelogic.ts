@@ -38,10 +38,10 @@ export interface Person {
 const MEN_IMAGES = Array.from({ length: 53 }, (_, i) => `/dating/men/man_${i + 1}.png`);
 const WOMEN_IMAGES = Array.from({ length: 61 }, (_, i) => `/dating/women/woman_${i + 1}.png`);
 
-// Helper functions for trait generation
+
 const generateCoreTraits = (): CoreTraits => {
-  // Generate traits using uniform distribution (0-10)
-  const uniformRandom = () => Math.floor(Math.random() * 11); // 0 to 10 inclusive
+  // Generate traits using uniform distribution
+  const uniformRandom = () => Math.floor(Math.random() * 11);
 
   return {
     openness: uniformRandom(),
@@ -52,24 +52,32 @@ const generateCoreTraits = (): CoreTraits => {
 };
 
 const generateMiscPreferences = (): MiscPreferences => {
-  const randomPreference = (): PreferenceValue => {
-    const rand = Math.random();
-    if (rand < 0.7) return 'neutral'; // 70% neutral
-    return rand < 0.85 ? 'positive' : 'negative'; // 15% positive, 15% negative
+ 
+  const preferences: MiscPreferences = {
+    cats: 'neutral',
+    dogs: 'neutral',
+    smoking: 'neutral',
+    drinking: 'neutral',
+    travel: 'neutral',
+    cooking: 'neutral',
+    reading: 'neutral',
+    music: 'neutral',
+    movies: 'neutral',
+    outdoors: 'neutral',
   };
 
-  return {
-    cats: randomPreference(),
-    dogs: randomPreference(),
-    smoking: randomPreference(),
-    drinking: randomPreference(),
-    travel: randomPreference(),
-    cooking: randomPreference(),
-    reading: randomPreference(),
-    music: randomPreference(),
-    movies: randomPreference(),
-    outdoors: randomPreference(),
-  };
+  const prefKeys = Object.keys(preferences) as (keyof MiscPreferences)[];
+
+  // Pick 1-2 random traits to be non-neutral
+  const numTraits = Math.random() < 0.5 ? 1 : 2;
+  const selectedTraits = prefKeys.sort(() => Math.random() - 0.5).slice(0, numTraits);
+
+  // Set selected traits to either positive or negative (50/50)
+  selectedTraits.forEach(trait => {
+    preferences[trait] = Math.random() < 0.5 ? 'positive' : 'negative';
+  });
+
+  return preferences;
 };
 
 const generateDisplayTraits = (
@@ -78,7 +86,6 @@ const generateDisplayTraits = (
 ): string[] => {
   const traits: string[] = [];
 
-  // Add core trait displays with 5 levels
   Object.entries(coreTraits).forEach(([traitName, value]) => {
     const traitKey = traitName as keyof typeof TRAIT_DISPLAY_WORDS;
     let level: 'veryLow' | 'low' | 'medium' | 'high' | 'veryHigh';
@@ -93,20 +100,17 @@ const generateDisplayTraits = (
     traits.push(options[Math.floor(Math.random() * options.length)]);
   });
 
-  // Add only 1-2 misc preference displays (not all of them)
   const nonNeutralPrefs = Object.entries(miscPreferences).filter(
     ([_, value]) => value !== 'neutral',
   );
-  const numMiscTraits = Math.min(nonNeutralPrefs.length, Math.floor(Math.random() * 2) + 1); // 1-2 misc traits
-  const selectedPrefs = nonNeutralPrefs.sort(() => Math.random() - 0.5).slice(0, numMiscTraits);
 
-  selectedPrefs.forEach(([prefName, value]) => {
+  nonNeutralPrefs.forEach(([prefName, value]) => {
     const prefKey = prefName as keyof typeof MISC_DISPLAY_WORDS;
     const options = MISC_DISPLAY_WORDS[prefKey][value];
     traits.push(options[Math.floor(Math.random() * options.length)]);
   });
 
-  // Sort traits by length (longest first, then shorter ones together)
+  // Sort traits by length for layouting
   traits.sort((a, b) => b.length - a.length);
 
   return traits;
@@ -131,7 +135,6 @@ export const createPersonGenerator = () => {
       lookingFor = 'both'; // bi
     }
 
-    // Generate personality traits
     const coreTraits = generateCoreTraits();
     const miscPreferences = generateMiscPreferences();
     const displayTraits = generateDisplayTraits(coreTraits, miscPreferences);
@@ -154,83 +157,80 @@ export const createPersonGenerator = () => {
   return generateRandomPerson;
 };
 
-// Couple compatibility judging system
+
 export const judgeCouple = (person1: Person, person2: Person): number => {
   let score = 0;
 
-  // 1. Attraction compatibility (extremely important - 50% of score)
-  let attractionScore = 0;
-
-  // Check if they're attracted to each other
-  const person1AttractedTo2 = person1.lookingFor === person2.gender || person1.lookingFor === 'both';
-  const person2AttractedTo1 = person2.lookingFor === person1.gender || person2.lookingFor === 'both';
-
-  if (person1AttractedTo2 && person2AttractedTo1) {
-    attractionScore = 50; // Perfect mutual attraction
-  } else if (person1AttractedTo2 || person2AttractedTo1) {
-    attractionScore = 25; // One-way attraction
-  } else {
-    attractionScore = 0; // No attraction
-  }
-
-  score += attractionScore;
-
-  // 2. Core traits compatibility (important - 35% of score)
-  let traitsScore = 0;
+  // 1. Core traits compatibility - each trait can give 0-25 points (max 100 total)
   const traitKeys: (keyof CoreTraits)[] = ['openness', 'sportiness', 'social', 'natural'];
 
   traitKeys.forEach(trait => {
     const diff = Math.abs(person1.coreTraits[trait] - person2.coreTraits[trait]);
-    // Score based on how close traits are (0 = identical, 10 = opposite)
-    const traitScore = Math.max(0, 10 - diff); // 0-10 scale
-    traitsScore += traitScore;
+
+    let traitScore: number;
+    if (diff === 0 || diff === 1) {
+      traitScore = 25;
+    } else if (diff === 2) {
+      traitScore = 18;
+    } else if (diff === 3) {
+      traitScore = 12;
+    } else if (diff === 4) {
+      traitScore = 7;
+    } else if (diff === 5) {
+      traitScore = 3;
+    } else if (diff === 6) {
+      traitScore = 1;
+    } else {
+      traitScore = 0;
+    }
+
+    score += traitScore;
   });
 
-  // Convert to percentage (max 40 points from 4 traits * 10)
-  traitsScore = (traitsScore / 40) * 35;
-  score += traitsScore;
-
-  // 3. Misc preferences alignment (15% of score)
-  let miscScore = 0;
-  let sharedPreferences = 0;
-  let conflictingPreferences = 0;
-
+  // 2. Misc preferences - +20 for same sign, -20 for opposite sign
   const prefKeys: (keyof MiscPreferences)[] = Object.keys(person1.miscPreferences) as (keyof MiscPreferences)[];
 
   prefKeys.forEach(pref => {
     const pref1 = person1.miscPreferences[pref];
     const pref2 = person2.miscPreferences[pref];
 
+    // Only apply bonus/penalty if both have non-neutral preferences
     if (pref1 !== 'neutral' && pref2 !== 'neutral') {
       if (pref1 === pref2) {
-        sharedPreferences += 1; // Both have same strong preference
+        score += 20; // Same preference
       } else {
-        conflictingPreferences += 1; // Conflicting strong preferences
+        score -= 20; // Conflicting preferences
       }
     }
   });
 
-  // Bonus for shared preferences, penalty for conflicts
-  miscScore = (sharedPreferences * 3) - (conflictingPreferences * 2);
-  miscScore = Math.max(0, Math.min(15, miscScore)); // Cap at 15%
-  score += miscScore;
+  // 3. Clamp final score between 0 and 100
+  score = Math.round(Math.max(0, Math.min(100, score)));
 
-  return Math.round(Math.max(0, Math.min(100, score)));
+  // 4. Check mutual attraction and apply penalty after clamping
+  const person1AttractedTo2 = person1.lookingFor === person2.gender || person1.lookingFor === 'both';
+  const person2AttractedTo1 = person2.lookingFor === person1.gender || person2.lookingFor === 'both';
+  const hasMutualAttraction = person1AttractedTo2 && person2AttractedTo1;
+
+  if (!hasMutualAttraction) {
+    score -= 100;
+  }
+
+  return score;
 };
 
-// News message generation for couples
+
 export const generateNewsMessage = (couples: { person1: Person; person2: Person; matchScore: number }[], maxRecentCouples: number = 5): string => {
   if (couples.length === 0) {
     return '';
   }
 
-  // Only use the last few couples (most recent)
   const recentCouples = couples.slice(-maxRecentCouples);
   const randomCouple = recentCouples[Math.floor(Math.random() * recentCouples.length)];
   const score = randomCouple.matchScore;
 
-  // Add noise to score for message selection (even good couples have awkward moments)
-  const noisyScore = score + (Math.random() - 0.5) * 30; // +-15 points of noise
+  // Add noise to score for message selection (even good couples have awkward moments, even bad ones have some fun)
+  const noisyScore = score + (Math.random() - 0.5) * 40; // +-20 points of noise
 
   let messageCategory: 'veryPositive' | 'positive' | 'neutral' | 'negative' | 'veryNegative';
   if (noisyScore >= 80) messageCategory = 'veryPositive';
@@ -242,7 +242,6 @@ export const generateNewsMessage = (couples: { person1: Person; person2: Person;
   const messages = COUPLE_MESSAGES[messageCategory];
   const template = messages[Math.floor(Math.random() * messages.length)];
 
-  // Replace placeholders with actual names
   return template
     .replace(/{person1}/g, randomCouple.person1.name)
     .replace(/{person2}/g, randomCouple.person2.name);
