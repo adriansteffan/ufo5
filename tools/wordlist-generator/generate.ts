@@ -89,17 +89,12 @@ const puzzleSequences = [
 ];
 
 function canBuildWord(word: string, availableLetters: string[]): boolean {
-  const letterCount: { [key: string]: number } = {};
-
-  for (const letter of availableLetters) {
-    letterCount[letter] = (letterCount[letter] || 0) + 1;
-  }
+  const availableSet = new Set(availableLetters);
 
   for (const letter of word) {
-    if (!letterCount[letter] || letterCount[letter] === 0) {
+    if (!availableSet.has(letter)) {
       return false;
     }
-    letterCount[letter]--;
   }
 
   return true;
