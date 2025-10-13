@@ -49,7 +49,7 @@ export interface MatchResult {
   winner: 'A' | 'B' | 'tie';
 }
 
-const MEN_IMAGES = Array.from({ length: 53 }, (_, i) => `/dating/men/man_${i + 1}.png`);
+const PLAYER_IMAGES = Array.from({ length: 10 }, (_, i) => `/sports/football_${i + 1}.png`);
 
 const generateStatValue = (): number => {
   return STAR_VALUES.sample()[0];
@@ -76,7 +76,7 @@ export const createPlayerGenerator = () => {
       Math.floor(Math.random() * 3)
     ] as PlayerType;
     const name = SURNAMES.sample()[0];
-    const image = MEN_IMAGES.sample()[0];
+    const image = PLAYER_IMAGES.sample()[0];
 
     const stats: PlayerStats = {
       defense: playerType === 'defense' ? generateBiasedStatValue() : generateStatValue(),

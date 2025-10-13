@@ -523,7 +523,7 @@ const PlayerCard = React.memo(
               e.stopPropagation();
               onDiscard();
             }}
-            className='absolute top-2 left-2 w-6 h-6 bg-red-500 border-2 border-white rounded-full flex items-center justify-center text-white font-bold text-xs hover:bg-red-600 cursor-pointer z-20'
+            className='absolute top-1.5 left-1.5 w-5 h-5 bg-white rounded-full flex items-center justify-center text-black font-bold text-[10px] hover:bg-gray-100 cursor-pointer z-20'
           >
             ✕
           </button>
@@ -544,10 +544,10 @@ const PlayerCard = React.memo(
             <motion.img
               src={player.image}
               alt={player.name}
-              className='absolute inset-0 w-full h-full object-contain'
+              className='absolute inset-0 w-full h-full object-cover object-top scale-103'
               draggable={false}
             />
-            <div className='absolute inset-0 bg-black/60'></div>
+            <div className='absolute inset-0 bg-black/55'></div>
             <div className='relative z-10 h-full flex flex-col justify-between p-2'>
               <PlayerName player={player} isInSlot={true} />
               <PlayerStats player={player} isInSlot={true} isEnlarged={isEnlarged} />
@@ -558,7 +558,7 @@ const PlayerCard = React.memo(
           /* Hand card: Layout with upper image and bottom stats */
           <>
             <motion.div
-              className='absolute top-2 left-0 right-0 h-26 cursor-pointer overflow-hidden'
+              className='absolute top-0 left-0 right-0 h-28 cursor-pointer overflow-hidden'
               initial='initial'
               whileHover='hover'
               onTap={(e) => {
@@ -570,10 +570,10 @@ const PlayerCard = React.memo(
               <motion.img
                 src={player.image}
                 alt={player.name}
-                className='w-full h-full object-contain'
+                className='w-full h-full object-cover object-top scale-103'
                 draggable={false}
               />
-              {onEnlarge && <EnlargeButton className='w-6 h-6 top-0 right-1' />}
+              {onEnlarge && <EnlargeButton className='w-5 h-5 top-1.5 right-1.5' />}
             </motion.div>
             <div className='absolute bottom-6 left-0 right-0 bg-white px-2 py-2 h-24'>
               <PlayerName player={player} isInSlot={false} />
