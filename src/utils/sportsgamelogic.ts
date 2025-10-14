@@ -49,7 +49,7 @@ export interface MatchResult {
   winner: 'A' | 'B' | 'tie';
 }
 
-const PLAYER_IMAGES = Array.from({ length: 10 }, (_, i) => `/sports/football_${i + 1}.png`);
+const PLAYER_IMAGES = Array.from({ length: 28 }, (_, i) => `/sports/football_${i + 1}.png`);
 
 const generateStatValue = (): number => {
   return STAR_VALUES.sample()[0];
