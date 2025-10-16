@@ -685,7 +685,7 @@ const experiment = subsetExperimentByParam([
                 strengths and weaknesses. Your task is to create two teams and have them
                 play matches by assigning players to positions: Attack (ATT), Defense (DEF), and Mid
                 (MID). Keep in mind that certain players have a better time in certain positions.
-                You have 4 minutes to spend in this game overall, so gave fun setting up different
+                You have 4 minutes to spend in this game overall, so have fun setting up different
                 matches!
               </p>
               <p>
