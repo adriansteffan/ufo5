@@ -5,6 +5,7 @@ import { CgSearch } from 'react-icons/cg';
 import { FaStar, FaStarHalfAlt, FaRegStar } from 'react-icons/fa';
 import { HelpModal } from './HelpModal';
 import { Timer } from './Timer';
+import { useScaledDrag } from '../hooks/useScaledDrag';
 import {
   createPlayerGenerator,
   simulateMatch,
@@ -504,17 +505,21 @@ const PlayerCard = React.memo(
     onDragEnd?: (player: Player, info: any) => void;
     onDrag?: (player: Player, info: any) => void;
   }) => {
+    const dragEnabled = !disableDrag;
+    const { x, y, isDragging, handlers } = useScaledDrag(
+      dragEnabled,
+      (info) => onDrag?.(player, info),
+      (info) => onDragEnd?.(player, info),
+    );
+
     return (
       <motion.div
         onTap={onClick}
-        drag={!disableDrag}
-        dragSnapToOrigin={true}
-        dragElastic={0.1}
-        whileHover={!disableHover ? { scale: 1.05 } : {}}
-        whileDrag={{ scale: 0.7, zIndex: 1000, rotate: 5, cursor: 'grabbing' }}
-        onDrag={(_, info) => onDrag?.(player, info)}
-        onDragEnd={(_, info) => onDragEnd?.(player, info)}
-        className={`relative bg-white border-2 border-black rounded-lg ${!disableHover ? 'cursor-grab' : 'cursor-pointer'} select-none ${isInSlot ? 'w-28 h-40' : 'w-40 h-60 pt-2 pb-6'} overflow-hidden`}
+        style={{ x, y }}
+        {...(dragEnabled ? handlers : {})}
+        animate={isDragging ? { scale: 0.7, zIndex: 1000, rotate: 5 } : { scale: 1, zIndex: 1, rotate: 0 }}
+        whileHover={!disableHover && !isDragging ? { scale: 1.05 } : {}}
+        className={`relative bg-white border-2 border-black rounded-lg ${isDragging ? 'cursor-grabbing' : !disableHover ? 'cursor-grab' : 'cursor-pointer'} select-none ${isInSlot ? 'w-28 h-40' : 'w-40 h-60 pt-2 pb-6'} overflow-hidden`}
       >
         {!isInSlot && onDiscard && (
           <button
@@ -933,7 +938,7 @@ export const SportsGame = ({
   };
 
   return (
-    <div className='min-h-screen w-full pt-0 bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] flex flex-col overflow-hidden'>
+    <div className='game-scale-container min-h-screen w-full pt-0 bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] flex flex-col overflow-hidden'>
       {/* Main Section - Timer, Field Layout */}
       <div className='p-1 flex mt-0'>
         {/* Left Side - Timer */}

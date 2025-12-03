@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'motion/react';
 import { CgSearch } from 'react-icons/cg';
 import { HelpModal } from './HelpModal';
 import { Timer } from './Timer';
+import { useScaledDrag } from '../hooks/useScaledDrag';
 import {
   createPersonGenerator,
   judgeCouple,
@@ -294,17 +295,21 @@ const PersonCard = React.memo(
       hover: { opacity: 1, scale: 1 },
     };
 
+    const dragEnabled = !disableDrag && !isInSlot && !roundOver;
+    const { x, y, isDragging, handlers } = useScaledDrag(
+      dragEnabled,
+      (info) => onDrag?.(person, info),
+      (info) => onDragEnd?.(person, info),
+    );
+
     return (
       <motion.div
         onTap={onClick}
-        drag={!disableDrag && !isInSlot && !roundOver}
-        dragSnapToOrigin={true}
-        dragElastic={0.1}
-        whileHover={!disableHover && !roundOver ? { scale: 1.05 } : {}}
-        whileDrag={{ scale: 1.1, zIndex: 1000, rotate: 5, cursor: 'grabbing' }}
-        onDrag={(_, info) => onDrag?.(person, info)}
-        onDragEnd={(_, info) => onDragEnd?.(person, info)}
-        className={`relative ${person.gender === 'female' ? 'bg-gradient-to-br from-pink-100 to-pink-200' : 'bg-gradient-to-br from-blue-100 to-blue-200'} border-2 border-black rounded-2xl ${!disableHover && !roundOver ? 'cursor-grab' : 'cursor-pointer'} select-none ${isInSlot ? 'w-36 h-54' : 'w-48 h-72'}`}
+        style={{ x, y }}
+        {...(dragEnabled ? handlers : {})}
+        animate={isDragging ? { scale: 1.1, zIndex: 1000, rotate: 5 } : { scale: 1, zIndex: 1, rotate: 0 }}
+        whileHover={!disableHover && !roundOver && !isDragging ? { scale: 1.05 } : {}}
+        className={`relative ${person.gender === 'female' ? 'bg-gradient-to-br from-pink-100 to-pink-200' : 'bg-gradient-to-br from-blue-100 to-blue-200'} border-2 border-black rounded-2xl ${isDragging ? 'cursor-grabbing' : !disableHover && !roundOver ? 'cursor-grab' : 'cursor-pointer'} select-none ${isInSlot ? 'w-36 h-54' : 'w-48 h-72'}`}
       >
         {!isInSlot && onDismiss && (
           <button
@@ -678,7 +683,7 @@ export const DatingGame = ({
   );
 
   return (
-    <div className='min-h-screen w-full pt-10 bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] flex flex-col overflow-hidden'>
+    <div className='game-scale-container min-h-screen w-full pt-10 bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px] flex flex-col overflow-hidden'>
       {/* Upper Section - Timer, Matching Area, and Recent Matches */}
       <div className='p-2 flex mt-8'>
         {/* Left Side - Timer */}

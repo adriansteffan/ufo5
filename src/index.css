@@ -9,3 +9,86 @@
 @source '../node_modules/@adriansteffan/reactive/dist/**/*.{js,jsx,ts,tsx}';
 @source '../node_modules/@adriansteffan/reactive/src/**/*.{js,jsx,ts,tsx}';
 
+/* Responsive scaling for small viewport heights (e.g., OS zoom at 150%) */
+/* --scale-factor is read by useScaledDrag hook to compensate drag movement */
+/* a bit hacky to do this atop tailwind, but what can you do */
+@media (max-height: 850px) {
+  :root {
+    --scale-factor: 0.9;
+  }
+  .game-scale-container {
+    zoom: 0.9;
+    min-height: calc(100vh / 0.9) !important;
+  }
+}
+
+@media (max-height: 750px) {
+  :root {
+    --scale-factor: 0.8;
+  }
+  .game-scale-container {
+    zoom: 0.8;
+    min-height: calc(100vh / 0.8) !important;
+  }
+}
+
+@media (max-height: 700px) {
+  :root {
+    --scale-factor: 0.75;
+  }
+  .game-scale-container {
+    zoom: 0.75;
+    min-height: calc(100vh / 0.75) !important;
+  }
+}
+
+@media (max-height: 650px) {
+  :root {
+    --scale-factor: 0.7;
+  }
+  .game-scale-container {
+    zoom: 0.7;
+    min-height: calc(100vh / 0.7) !important;
+  }
+}
+
+@media (max-height: 600px) {
+  :root {
+    --scale-factor: 0.65;
+  }
+  .game-scale-container {
+    zoom: 0.65;
+    min-height: calc(100vh / 0.65) !important;
+  }
+}
+
+@media (max-height: 550px) {
+  :root {
+    --scale-factor: 0.6;
+  }
+  .game-scale-container {
+    zoom: 0.6;
+    min-height: calc(100vh / 0.6) !important;
+  }
+}
+
+@media (max-height: 500px) {
+  :root {
+    --scale-factor: 0.55;
+  }
+  .game-scale-container {
+    zoom: 0.55;
+    min-height: calc(100vh / 0.55) !important;
+  }
+}
+
+@media (max-height: 450px) {
+  :root {
+    --scale-factor: 0.5;
+  }
+  .game-scale-container {
+    zoom: 0.5;
+    min-height: calc(100vh / 0.5) !important;
+  }
+}
+
