@@ -57,6 +57,32 @@ const TASK_DESCRIPTIONS = {
     'Manage football teams through strategic decisions. Choose a lineup and formation and have the teams play each other.',
 };
 
+// Need for Cognition scale (Coelho et al., 2020) - 6 items
+// Items 3 and 4 are reverse-scored
+const NFC_QUESTIONS = [
+  { name: 'nfc_1', title: 'I would prefer complex to simple problems.' },
+  {
+    name: 'nfc_2',
+    title: 'I like to have the responsibility of handling a situation that requires a lot of thinking.',
+  },
+  { name: 'nfc_3', title: 'Thinking is not my idea of fun.' }, // reversed
+  {
+    name: 'nfc_4',
+    title:
+      'I would rather do something that requires little thought than something that is sure to challenge my thinking abilities.',
+  }, // reversed
+  {
+    name: 'nfc_5',
+    title: 'I really enjoy a task that involves coming up with new solutions to problems.',
+  },
+  {
+    name: 'nfc_6',
+    title:
+      'I would prefer a task that is intellectual, difficult, and important to one that is somewhat important but does not require much thought.',
+  },
+];
+
+
 const groups = ['choice', 'anti-choice', 'random'];
 const PARTICIPANT_GROUP =
   getParam(
@@ -76,12 +102,46 @@ const FORCED_TASK = FORCE_TASK
   ? FORCE_TASK.charAt(0).toUpperCase() + FORCE_TASK.slice(1).toLowerCase() + 'Game'
   : '';
 
-const USE_SIMPLIFIED_RANKING = getParam(
-  'simplified_ranking',
-  false,
-  'boolean',
-  'Use simplified drag-and-drop ranking instead of 1-10 rating system',
-);
+
+const questionGroups = ['pre', 'post'];
+const QUESTION_GROUP =
+  getParam(
+    'question_group',
+    '',
+    'string',
+    'Question group: "pre" (NFC before game), "post" (NFC after game)',
+  ) || questionGroups.sample()[0];
+
+
+const nfcQuestionnaire = {
+  name: 'NFCQuestionnaire',
+  type: 'Quest',
+  props: {
+    surveyJson: {
+      pages: [
+        {
+          name: 'need_for_cognition',
+          title:
+            QUESTION_GROUP === 'pre'
+              ? 'Before we get to the game though, let me ask you a few questions!'
+              : 'Now before we can wrap this up, here are a few more questions!',
+          description: 'How much do you agree with the following statements?',
+          elements: NFC_QUESTIONS.map((q) => ({
+            type: 'rating',
+            name: q.name,
+            title: q.title,
+            isRequired: true,
+            rateMin: 1,
+            rateMax: 5,
+            displayMode: window.innerWidth > 768 ? 'buttons' : 'dropdown',
+            minRateDescription: 'Strongly Disagree',
+            maxRateDescription: 'Strongly Agree',
+          })),
+        },
+      ],
+    },
+  },
+};
 
 const flatteners = {
   TaskRanking: (item: TrialData) => {
@@ -385,34 +445,6 @@ const experiment = subsetExperimentByParam([
       ),
     },
   },
-  {
-    name: 'InitialQuestionnaire',
-    type: 'Quest',
-    props: {
-      surveyJson: {
-        pages: [
-          {
-            name: 'demographics',
-            title: "Let's start with some questions!",
-            elements: [
-              {
-                type: 'rating',
-                name: 'computer_experience',
-                title: 'How experienced are you with using computers?',
-                // based on bug: https://surveyjs.answerdesk.io/ticket/details/t17582/rating-scale-is-displayed-as-drop-down-regardless-of-the-available-page-size
-                displayMode: window.innerWidth > 768 ? 'buttons' : 'dropdown',
-                isRequired: true,
-                rateMin: 1,
-                rateMax: 6,
-                minRateDescription: 'Not experienced',
-                maxRateDescription: 'Very experienced',
-              },
-            ],
-          },
-        ],
-      },
-    },
-  },
 
   {
     type: 'IF_BLOCK',
@@ -483,8 +515,7 @@ const experiment = subsetExperimentByParam([
       let taskRankings = null;
 
       if (PARTICIPANT_GROUP === 'choice' || PARTICIPANT_GROUP === 'anti-choice') {
-        const trialName = USE_SIMPLIFIED_RANKING ? 'TaskRanking' : 'TaskRating';
-        const taskRankingTrial = data.find((trial: any) => trial.name === trialName);
+        const taskRankingTrial = data.find((trial: any) => trial.name === 'TaskRating');
         const rankings = taskRankingTrial?.responseData?.rankings;
         if (rankings) {
           const targetRank = PARTICIPANT_GROUP === 'choice' ? 1 : TASKS.length;
@@ -501,6 +532,13 @@ const experiment = subsetExperimentByParam([
         taskRankings,
       };
     },
+  },
+
+  // NFC questionnaire for "pre" group (before game)
+  {
+    type: 'IF_BLOCK',
+    cond: () => QUESTION_GROUP === 'pre',
+    timeline: [nfcQuestionnaire],
   },
 
   // For random group - wheel of fortune
@@ -729,32 +767,137 @@ const experiment = subsetExperimentByParam([
     ],
   },
 
+  // Post-game questionnaire with sliders
   {
-    name: 'ExitQuestionnaire',
+    name: 'PostQuestionnaire',
     type: 'Quest',
     props: {
       surveyJson: {
         pages: [
           {
-            name: 'experience',
+            name: 'post_screen1',
             title: 'Your Experience',
+            description: 'Please reflect on your experience with the game you just played.',
             elements: [
               {
-                type: 'rating',
-                name: 'task_enjoyment',
-                title: 'How much did you enjoy the game?',
+                type: 'slider',
+                name: 'mental_activity',
+                title:
+                  'How much mental activity was required (e.g. thinking, deciding, calculating, remembering, looking, searching, etc.)?',
                 isRequired: true,
-                rateMin: 1,
-                rateMax: 7,
-                displayMode: window.innerWidth > 768 ? 'buttons' : 'dropdown', // same fix as above
-                minRateDescription: 'Not at all',
-                maxRateDescription: 'Very much',
+                min: 0,
+                max: 100,
+                step: 1,
+                tooltipVisibility: 'never',
+                customLabels: [
+                  { value: 0, text: 'None' },
+                  { value: 100, text: 'Maximum amount imaginable' },
+                ],
               },
               {
-                type: 'comment',
-                name: 'feedback',
-                title: 'How sad are you that there are no other questions yet?',
-                isRequired: false,
+                type: 'slider',
+                name: 'satisfaction',
+                title: 'How satisfied were you with your performance?',
+                isRequired: true,
+                min: 0,
+                max: 100,
+                step: 1,
+                tooltipVisibility: 'never',
+                customLabels: [
+                  { value: 0, text: 'Not at all' },
+                  { value: 100, text: 'Absolutely' },
+                ],
+              },
+              {
+                type: 'slider',
+                name: 'importance',
+                title: 'Was it important for you to do well on the task?',
+                isRequired: true,
+                min: 0,
+                max: 100,
+                step: 1,
+                tooltipVisibility: 'never',
+                customLabels: [
+                  { value: 0, text: 'Not at all' },
+                  { value: 100, text: 'Absolutely' },
+                ],
+              },
+              {
+                type: 'slider',
+                name: 'background_knowledge',
+                title: 'Did you have enough background knowledge to complete the task?',
+                isRequired: true,
+                min: 0,
+                max: 100,
+                step: 1,
+                tooltipVisibility: 'never',
+                customLabels: [
+                  { value: 0, text: 'None' },
+                  { value: 100, text: 'More than enough' },
+                ],
+              },
+            ],
+          },
+          {
+            name: 'post_screen2',
+            title: 'Your Experience (continued)',
+            description: 'Please reflect on your experience with the game you just played.',
+            elements: [
+              {
+                type: 'slider',
+                name: 'effort',
+                title: 'To what extent did you put in effort to complete the task?',
+                isRequired: true,
+                min: 0,
+                max: 100,
+                step: 1,
+                tooltipVisibility: 'never',
+                customLabels: [
+                  { value: 0, text: 'No effort at all' },
+                  { value: 100, text: 'Maximum amount of effort imaginable' },
+                ],
+              },
+              {
+                type: 'slider',
+                name: 'frustration',
+                title: 'How frustrated were you during the task?',
+                isRequired: true,
+                min: 0,
+                max: 100,
+                step: 1,
+                tooltipVisibility: 'never',
+                customLabels: [
+                  { value: 0, text: 'Not at all' },
+                  { value: 100, text: 'Absolutely' },
+                ],
+              },
+              {
+                type: 'slider',
+                name: 'boredom',
+                title: 'How bored were you?',
+                isRequired: true,
+                min: 0,
+                max: 100,
+                step: 1,
+                tooltipVisibility: 'never',
+                customLabels: [
+                  { value: 0, text: 'Not at all' },
+                  { value: 100, text: 'Absolutely' },
+                ],
+              },
+              {
+                type: 'slider',
+                name: 'enjoyment',
+                title: 'How much did you enjoy the task?',
+                isRequired: true,
+                min: 0,
+                max: 100,
+                step: 1,
+                tooltipVisibility: 'never',
+                customLabels: [
+                  { value: 0, text: 'Not at all' },
+                  { value: 100, text: 'Absolutely' },
+                ],
               },
             ],
           },
@@ -763,27 +906,35 @@ const experiment = subsetExperimentByParam([
     },
   },
 
+  // NFC questionnaire for "post" group (after sliders)
+  {
+    type: 'IF_BLOCK',
+    cond: () => QUESTION_GROUP === 'post',
+    timeline: [nfcQuestionnaire],
+  },
+
   {
     name: 'Upload',
     type: 'Upload',
     props: {
       sessionCSVBuilder: {
         filename: '',
-        trials: ['CheckDevice'],
+        trials: [
+          'CheckDevice',
+          'NFCQuestionnaire',
+          'PostQuestionnaire',
+        ],
         fun: (sessionInfo: Record<string, any>) => {
           return {
             ...sessionInfo,
             group: PARTICIPANT_GROUP,
+            question_group: QUESTION_GROUP,
           };
         },
       },
       trialCSVBuilder: {
         flatteners: flatteners,
         builders: [
-          {
-            filename: `_DEMOGRAPHICS_${Date.now()}`,
-            trials: ['InitialQuestionnaire'],
-          },
           {
             filename: `_TASK_RANKING_${Date.now()}`,
             trials: ['TaskRanking'],
@@ -809,8 +960,12 @@ const experiment = subsetExperimentByParam([
             trials: ['DatingGame'],
           },
           {
-            filename: `_EXIT_QUESTIONNAIRE_${Date.now()}`,
-            trials: ['ExitQuestionnaire'],
+            filename: `_NFC_QUESTIONNAIRE_${Date.now()}`,
+            trials: ['NFCQuestionnaire'],
+          },
+          {
+            filename: `_POST_QUESTIONNAIRE_${Date.now()}`,
+            trials: ['PostQuestionnaire'],
           },
         ],
       },
