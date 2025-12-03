@@ -511,7 +511,7 @@ const PlayerCard = React.memo(
         dragSnapToOrigin={true}
         dragElastic={0.1}
         whileHover={!disableHover ? { scale: 1.05 } : {}}
-        whileDrag={{ scale: 1.1, zIndex: 1000, rotate: 5, cursor: 'grabbing' }}
+        whileDrag={{ scale: 0.7, zIndex: 1000, rotate: 5, cursor: 'grabbing' }}
         onDrag={(_, info) => onDrag?.(player, info)}
         onDragEnd={(_, info) => onDragEnd?.(player, info)}
         className={`relative bg-white border-2 border-black rounded-lg ${!disableHover ? 'cursor-grab' : 'cursor-pointer'} select-none ${isInSlot ? 'w-28 h-40' : 'w-40 h-60 pt-2 pb-6'} overflow-hidden`}
