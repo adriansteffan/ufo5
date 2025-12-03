@@ -131,8 +131,7 @@ export const TaskRating = ({ next, tasks, taskNames, taskDescriptions, revealCon
                   initial={false}
                   animate={{
                     opacity: 1,
-                    y: 0,
-                    scale: showWinner ? 1.05 : 1
+                    y: 0
                   }}
                   exit={{ opacity: 0, y: -50, scale: 0.8 }}
                   layoutId={task}
@@ -146,7 +145,6 @@ export const TaskRating = ({ next, tasks, taskNames, taskDescriptions, revealCon
                     },
                     opacity: { duration: 0.3 },
                     y: { duration: 0.3 },
-                    scale: { duration: 0.3 },
                   }}
                   className='p-4 bg-white border-3 border-black rounded-lg shadow-[2px_2px_0px_rgba(0,0,0,1)] will-change-transform'
                   style={{
