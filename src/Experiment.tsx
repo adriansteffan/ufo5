@@ -88,7 +88,7 @@ const flatteners = {
     const { index, trialNumber, start, end, duration, type, name } = item;
     const flattenedData = flattenTaskRankingData(item.responseData);
 
-    return flattenedData.map(data => ({
+    return flattenedData.map((data) => ({
       trialIndex: index,
       trialNumber,
       trialStart: start,
@@ -104,7 +104,7 @@ const flatteners = {
     const { index, trialNumber, start, end, duration, type, name } = item;
     const flattenedData = flattenTaskRatingData(item.responseData);
 
-    return flattenedData.map(data => ({
+    return flattenedData.map((data) => ({
       trialIndex: index,
       trialNumber,
       trialStart: start,
@@ -120,7 +120,7 @@ const flatteners = {
     const { index, trialNumber, start, end, duration, type, name } = item;
     const flattenedActions = flattenWordGameData(item.responseData);
 
-    return flattenedActions.map(action => ({
+    return flattenedActions.map((action) => ({
       trialIndex: index,
       trialNumber,
       trialStart: start,
@@ -136,7 +136,7 @@ const flatteners = {
     const { index, trialNumber, start, end, duration, type, name } = item;
     const flattenedActions = flattenNumberGameData(item.responseData);
 
-    return flattenedActions.map(action => ({
+    return flattenedActions.map((action) => ({
       trialIndex: index,
       trialNumber,
       trialStart: start,
@@ -153,7 +153,7 @@ const flatteners = {
     const { actions, playerDatabase, matchDatabase } = flattenSportsGameData(item.responseData);
 
     return {
-      actions: actions.map(action => ({
+      actions: actions.map((action) => ({
         trialIndex: index,
         trialNumber,
         trialStart: start,
@@ -164,7 +164,7 @@ const flatteners = {
         ...action,
       })),
 
-      playerDatabase: playerDatabase.map(player => ({
+      playerDatabase: playerDatabase.map((player) => ({
         trialIndex: index,
         trialNumber,
         trialStart: start,
@@ -175,7 +175,7 @@ const flatteners = {
         ...player,
       })),
 
-      matchDatabase: matchDatabase.map(match => ({
+      matchDatabase: matchDatabase.map((match) => ({
         trialIndex: index,
         trialNumber,
         trialStart: start,
@@ -193,7 +193,7 @@ const flatteners = {
     const { actions, matchDatabase, peopleDatabase } = flattenDatingGameData(item.responseData);
 
     return {
-      actions: actions.map(action => ({
+      actions: actions.map((action) => ({
         trialIndex: index,
         trialNumber,
         trialStart: start,
@@ -204,7 +204,7 @@ const flatteners = {
         ...action,
       })),
 
-      matchDatabase: matchDatabase.map(match => ({
+      matchDatabase: matchDatabase.map((match) => ({
         trialIndex: index,
         trialNumber,
         trialStart: start,
@@ -215,7 +215,7 @@ const flatteners = {
         ...match,
       })),
 
-      peopleDatabase: peopleDatabase.map(person => ({
+      peopleDatabase: peopleDatabase.map((person) => ({
         trialIndex: index,
         trialNumber,
         trialStart: start,
@@ -254,7 +254,8 @@ const experiment = subsetExperimentByParam([
           Thank you for participating in our research. In this study, we examine how people's
           engagement differs between various little games we have developed. Over the next 15
           minutes, you will answer a handful of survey questions and play one of these games
-          yourself. Press the button below to continue to the participant information and guidelines.
+          yourself. Press the button below to continue to the participant information and
+          guidelines.
           <br />
         </div>
       ),
@@ -449,25 +450,28 @@ const experiment = subsetExperimentByParam([
           ),
         },
       },
-      USE_SIMPLIFIED_RANKING
-        ? {
-            name: 'TaskRanking',
-            type: 'TaskRanking',
-            props: {
-              tasks: TASKS,
-              taskNames: TASK_NAMES,
-              taskDescriptions: TASK_DESCRIPTIONS,
-            },
-          }
-        : {
-            name: 'TaskRating',
-            type: 'TaskRating',
-            props: {
-              tasks: TASKS,
-              taskNames: TASK_NAMES,
-              taskDescriptions: TASK_DESCRIPTIONS,
-            },
+      {
+        name: 'TaskRating',
+        type: 'TaskRating',
+        props: {
+          tasks: TASKS,
+          taskNames: TASK_NAMES,
+          taskDescriptions: TASK_DESCRIPTIONS,
+          revealConfig: {
+            selectTask: ({ rankings }: { rankings: Record<string, number> }) =>
+              Object.entries(rankings).find(
+                ([, rank]) => rank === (PARTICIPANT_GROUP === 'choice' ? 1 : TASKS.length),
+              )?.[0] || '',
+            getMessage: (_taskKey: string, taskName: string) => (
+              <>
+                Based on your preferences, you will be playing your{' '}
+                <strong>{PARTICIPANT_GROUP === 'choice' ? 'favorite' : 'least favorite'}</strong>{' '}
+                game: <strong>{taskName}</strong>
+              </>
+            ),
           },
+        },
+      },
     ],
   },
 
@@ -499,16 +503,23 @@ const experiment = subsetExperimentByParam([
     },
   },
 
+  // For random group - wheel of fortune
   {
-    name: 'WheelOfFortune',
-    type: 'WheelOfFortune',
-    props: (_data: any, store: any) => ({
-      segments: Object.values(TASK_NAMES),
-      segColors: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFEAA7'], // '#96CEB4'
-      winningSegment: TASK_NAMES[store.selectedTask],
-      size: 250,
-      buttonText: 'SPIN!',
-    }),
+    type: 'IF_BLOCK',
+    cond: () => PARTICIPANT_GROUP === 'random',
+    timeline: [
+      {
+        name: 'WheelOfFortune',
+        type: 'WheelOfFortune',
+        props: (_data: any, store: any) => ({
+          segments: Object.values(TASK_NAMES),
+          segColors: ['#FF6B6B', '#4ECDC4', '#45B7D1', '#FFEAA7'],
+          winningSegment: TASK_NAMES[store.selectedTask],
+          size: 250,
+          buttonText: 'SPIN!',
+        }),
+      },
+    ],
   },
 
   {
@@ -681,8 +692,8 @@ const experiment = subsetExperimentByParam([
               <p>
                 Let's play a round of {TASK_NAMES['SportsGame']}! In this management sandbox, you
                 will be presented with cards of virtual football players, each having different
-                strengths and weaknesses. Your task is to create two teams and have them
-                play matches by assigning players to positions: Attack (ATT), Defense (DEF), and Mid
+                strengths and weaknesses. Your task is to create two teams and have them play
+                matches by assigning players to positions: Attack (ATT), Defense (DEF), and Mid
                 (MID). Keep in mind that certain players have a better time in certain positions.
                 You have 4 minutes to spend in this game overall, so have fun setting up different
                 matches!
@@ -695,7 +706,10 @@ const experiment = subsetExperimentByParam([
                   Use DRAFT to add new players to your hand for a selection of up to 6 at a time
                 </li>
                 <li>Drag players from your hand to team positions on the field to assign them</li>
-                <li>You can drag players between positions to <strong>swap them</strong>. This also works if both slots already have players in them</li>
+                <li>
+                  You can drag players between positions to <strong>swap them</strong>. This also
+                  works if both slots already have players in them
+                </li>
                 <li>Click START MATCH when the positions of both teams are filled</li>
                 <li>Drag players from positions to an area with no slots</li>
                 <li>Click ✕ on hand cards to discard unwanted players</li>

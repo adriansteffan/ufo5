@@ -1,17 +1,30 @@
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BaseComponentProps } from '@adriansteffan/reactive';
 import { motion, AnimatePresence } from 'motion/react';
+
+interface RevealConfig {
+  selectTask: (data: { rankings: Record<string, number>; ratings: Record<string, number> }) => string;
+  getMessage: (taskKey: string, taskName: string) => React.ReactNode;
+}
 
 interface TaskRatingProps extends BaseComponentProps {
   tasks: string[];
   taskNames: Record<string, string>;
   taskDescriptions: Record<string, string>;
+  revealConfig?: RevealConfig;
 }
 
-export const TaskRating = ({ next, tasks, taskNames, taskDescriptions }: TaskRatingProps) => {
+export const TaskRating = ({ next, tasks, taskNames, taskDescriptions, revealConfig }: TaskRatingProps) => {
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [orderedTasks, setOrderedTasks] = useState<string[]>(() => [...tasks].shuffle());
   const [popupTask, setPopupTask] = useState<string | null>(null);
+
+  // Reveal animation state
+  const [isRevealing, setIsRevealing] = useState(false);
+  const [visibleTasks, setVisibleTasks] = useState<string[]>([]);
+  const [selectedTask, setSelectedTask] = useState<string | null>(null);
+  const [showWinner, setShowWinner] = useState(false);
+  const [showFinalMessage, setShowFinalMessage] = useState(false);
 
   useEffect(() => {
     // Only sort if there are actual ratings, otherwise preserve random order
@@ -37,6 +50,36 @@ export const TaskRating = ({ next, tasks, taskNames, taskDescriptions }: TaskRat
     orderedTasks.forEach((task, index) => {
       rankings[task] = index + 1;
     });
+
+    if (revealConfig) {
+      setIsRevealing(true);
+      setVisibleTasks([...orderedTasks]);
+
+      const selected = revealConfig.selectTask({ rankings, ratings });
+      setSelectedTask(selected);
+
+      const toRemove = orderedTasks.filter(t => t !== selected);
+      toRemove.forEach((task, i) => {
+        setTimeout(() => {
+          setVisibleTasks(prev => prev.filter(t => t !== task));
+        }, 500 + i * 600);
+      });
+
+      // After all cards fade out, wait a moment, then show winner (triggers scale + header change)
+      const allFadedOutTime = 500 + toRemove.length * 600;
+      setTimeout(() => setShowWinner(true), allFadedOutTime + 400);
+      // Show final message after scale animation completes
+      setTimeout(() => setShowFinalMessage(true), allFadedOutTime + 400 + 500);
+    } else {
+      next({ rankings, ratings });
+    }
+  };
+
+  const handleFinalNext = () => {
+    const rankings: Record<string, number> = {};
+    orderedTasks.forEach((task, index) => {
+      rankings[task] = index + 1;
+    });
     next({ rankings, ratings });
   };
 
@@ -51,51 +94,74 @@ export const TaskRating = ({ next, tasks, taskNames, taskDescriptions }: TaskRat
 
   const allTasksRated = tasks.every(task => ratings[task] > 0);
 
+  // Determine which tasks to display
+  const displayTasks = isRevealing ? visibleTasks : orderedTasks;
+
   return (
     <div className='min-h-screen w-full bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]'>
       <div className='p-8 pt-16 max-w-4xl mx-auto flex flex-col gap-4 items-center'>
-        <h2 className='text-4xl font-bold mb-6 text-center'>Rate the Games!</h2>
-        <p className='mb-8 text-lg max-w-2xl'>
-          We want to know how interested you would be in playing these games! Please rate each game from 1 (not interested) to 10 (very interested).
-          The games will automatically order themselves based on your ratings. <br />
-          If you want to read a game's description again, press the ? icon.
-        </p>
+        <AnimatePresence mode='wait'>
+          <motion.h2
+            className='text-4xl font-bold mb-6 text-center'
+            initial={showWinner ? { opacity: 0 } : false}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+            key={showWinner ? 'reveal' : 'rate'}
+          >
+            {showWinner ? 'Your game has been selected!' : 'Rate the Games!'}
+          </motion.h2>
+        </AnimatePresence>
+
+        {!showWinner && (
+          <p className='mb-8 text-lg max-w-2xl'>
+            We want to know how interested you would be in playing these games! Please rate each game from 1 (not interested) to 10 (very interested).
+            The games will automatically order themselves based on your ratings. <br />
+            If you want to read a game's description again, press the ? icon.
+          </p>
+        )}
 
         <div className='w-full max-w-2xl'>
           <div className='space-y-4'>
             <AnimatePresence>
-              {orderedTasks.map((task, index) => (
+              {displayTasks.map((task, index) => (
                 <motion.div
                   key={task}
                   layout
-                  initial={{ opacity: 0, y: 20, scale: 0.9 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: -20, scale: 0.9 }}
+                  initial={false}
+                  animate={{
+                    opacity: 1,
+                    y: 0,
+                    scale: showWinner ? 1.05 : 1
+                  }}
+                  exit={{ opacity: 0, y: -50, scale: 0.8 }}
                   layoutId={task}
                   transition={{
                     layout: {
                       duration: 0.6,
                       ease: [0.4, 0, 0.2, 1],
-                      type: "spring",
+                      type: 'spring',
                       stiffness: 300,
-                      damping: 30
+                      damping: 30,
                     },
                     opacity: { duration: 0.3 },
                     y: { duration: 0.3 },
-                    scale: { duration: 0.2 }
+                    scale: { duration: 0.3 },
                   }}
                   className='p-4 bg-white border-3 border-black rounded-lg shadow-[2px_2px_0px_rgba(0,0,0,1)] will-change-transform'
                   style={{
                     position: 'relative',
-                    zIndex: ratings[task] ? 10 : 1
+                    zIndex: ratings[task] ? 10 : 1,
                   }}
                 >
                   <div className='flex items-center justify-between'>
                     <div className='flex items-center gap-4'>
                       <div className='w-8 h-8 rounded-full bg-yellow-300 border-2 border-black flex items-center justify-center font-bold text-lg'>
-                        {index + 1}
+                        {orderedTasks.indexOf(task) + 1}
                       </div>
-                      <span className='font-semibold text-lg'>{taskNames[task]}</span>
+                      <span className='font-semibold text-lg'>
+                        {taskNames[task]}
+                      </span>
                     </div>
 
                     <div className='flex items-center gap-2'>
@@ -103,11 +169,13 @@ export const TaskRating = ({ next, tasks, taskNames, taskDescriptions }: TaskRat
                         {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((rating) => (
                           <button
                             key={rating}
-                            onClick={() => handleRatingChange(task, rating)}
-                            className={`w-8 h-8 rounded border-2 border-black font-bold text-sm transition-all duration-150 cursor-pointer ${
+                            onClick={() => !isRevealing && handleRatingChange(task, rating)}
+                            className={`w-8 h-8 rounded border-2 border-black font-bold text-sm transition-all duration-150 ${
+                              isRevealing ? 'cursor-default' : 'cursor-pointer'
+                            } ${
                               ratings[task] === rating
                                 ? 'bg-blue-300 shadow-[2px_2px_0px_rgba(0,0,0,1)]'
-                                : 'bg-white hover:bg-gray-100'
+                                : isRevealing ? 'bg-white' : 'bg-white hover:bg-gray-100'
                             }`}
                           >
                             {rating}
@@ -115,9 +183,11 @@ export const TaskRating = ({ next, tasks, taskNames, taskDescriptions }: TaskRat
                         ))}
                       </div>
                       <button
-                        onClick={(e) => handleQuestionClick(task, e)}
-                        className='w-6 h-6 rounded-full bg-white border-2 border-black flex items-center justify-center font-bold text-sm hover:bg-gray-400 cursor-help ml-2'
-                        title={`Learn more about: ${task}`}
+                        onClick={(e) => !isRevealing && handleQuestionClick(task, e)}
+                        className={`w-6 h-6 rounded-full bg-white border-2 border-black flex items-center justify-center font-bold text-sm ml-2 ${
+                          isRevealing ? 'cursor-default' : 'hover:bg-gray-400 cursor-help'
+                        }`}
+                        title={isRevealing ? undefined : `Learn more about: ${task}`}
                       >
                         ?
                       </button>
@@ -129,17 +199,44 @@ export const TaskRating = ({ next, tasks, taskNames, taskDescriptions }: TaskRat
           </div>
         </div>
 
-        <button
-          onClick={handleNext}
-          disabled={!allTasksRated}
-          className={`mt-8 px-8 py-3 border-2 border-black font-bold text-lg rounded-xl transition-all duration-150 ${
-            allTasksRated
-              ? 'cursor-pointer bg-white shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-none text-black'
-              : 'bg-white opacity-50 disabled:opacity-50 cursor-pointer select-none text-black'
-          }`}
-        >
-          Continue
-        </button>
+        {/* Final message during reveal */}
+        <AnimatePresence>
+          {showFinalMessage && selectedTask && revealConfig && (
+            <motion.p
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              className='mt-6 text-xl text-center'
+            >
+              {revealConfig.getMessage(selectedTask, taskNames[selectedTask])}
+            </motion.p>
+          )}
+        </AnimatePresence>
+
+        {/* Continue button - different behavior based on reveal state */}
+        {!isRevealing ? (
+          <button
+            onClick={handleNext}
+            disabled={!allTasksRated}
+            className={`mt-8 px-8 py-3 border-2 border-black font-bold text-lg rounded-xl transition-all duration-150 ${
+              allTasksRated
+                ? 'cursor-pointer bg-white shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-none text-black'
+                : 'bg-white opacity-50 disabled:opacity-50 cursor-pointer select-none text-black'
+            }`}
+          >
+            Continue
+          </button>
+        ) : (
+          showFinalMessage && (
+            <motion.button
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              onClick={handleFinalNext}
+              className='mt-8 px-8 py-3 border-2 border-black font-bold text-lg rounded-xl transition-all duration-150 cursor-pointer bg-white shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-none text-black'
+            >
+              Continue
+            </motion.button>
+          )
+        )}
       </div>
 
       {/* Popup Modal */}
