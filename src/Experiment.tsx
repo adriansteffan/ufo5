@@ -15,7 +15,6 @@ import {
   NumberGame,
   DatingGame,
   SportsGame,
-  ElementsGame,
   WheelOfFortune,
 } from './components';
 
@@ -39,7 +38,7 @@ const TASK_TIME_LIMIT = getParam(
   'Time limit for timed tasks in seconds',
 );
 
-const TASKS = ['WordGame', 'NumberGame', 'DatingGame', 'SportsGame']; // 'ElementsGame'
+const TASKS = ['WordGame', 'NumberGame', 'DatingGame', 'SportsGame'];
 const TASK_NAMES = {
   WordGame: 'Words',
   NumberGame: 'Numbers',
@@ -71,7 +70,7 @@ const FORCE_TASK = getParam(
   'task',
   '',
   'string',
-  'Force specific task: word, number, dating, sports, elements',
+  'Force specific task: word, number, dating, sports',
 );
 const FORCED_TASK = FORCE_TASK
   ? FORCE_TASK.charAt(0).toUpperCase() + FORCE_TASK.slice(1).toLowerCase() + 'Game'
@@ -717,43 +716,6 @@ const experiment = subsetExperimentByParam([
   },
 
   {
-    type: 'IF_BLOCK',
-    cond: (_data: any, store: any) => store.selectedTask === 'ElementsGame',
-    timeline: [
-      {
-        name: 'ElementsGameInstructions',
-        type: 'Text',
-        props: {
-          buttonText: "Let's Play",
-          containerClass:
-            'bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]',
-          content: (
-            <div className='bg-white p-8 rounded-lg'>
-              <h1 className='text-4xl'>
-                <strong>{TASK_NAMES['ElementsGame']}</strong>
-              </h1>
-              <br />
-              <p>
-                Let's play a round of {TASK_NAMES['ElementsGame']}! Your goal is to create as many
-                valid words as possible using the given set of 7 letters. As this game is a bit more
-                involved, we will play a short tutorial round.
-              </p>
-              <br />
-            </div>
-          ),
-        },
-      },
-      {
-        name: 'ElementsGame',
-        type: 'ElementsGame',
-        props: {
-          // Elements Game specific props
-        },
-      },
-    ],
-  },
-
-  {
     name: 'ExitQuestionnaire',
     type: 'Quest',
     props: {
@@ -833,10 +795,6 @@ const experiment = subsetExperimentByParam([
             trials: ['DatingGame'],
           },
           {
-            filename: `_ELEMENTSGAME_${Date.now()}`,
-            trials: ['ElementsGame'],
-          },
-          {
             filename: `_EXIT_QUESTIONNAIRE_${Date.now()}`,
             trials: ['ExitQuestionnaire'],
           },
@@ -863,7 +821,6 @@ export default function Experiment() {
         NumberGame,
         DatingGame,
         SportsGame,
-        ElementsGame,
         WheelOfFortune,
       }}
     />
