@@ -124,7 +124,7 @@ export const TaskRating = ({ next, tasks, taskNames, taskDescriptions, revealCon
         <div className='w-full max-w-2xl'>
           <div className='space-y-4'>
             <AnimatePresence>
-              {displayTasks.map((task, index) => (
+              {displayTasks.map((task) => (
                 <motion.div
                   key={task}
                   layout
