@@ -1108,8 +1108,8 @@ export const SportsGame = ({
                 Use DRAFT to add new players to your hand for a selection of up to 6 at a time
               </li>
               <li>Drag players from your hand to team positions on the field to assign them</li>
-              <li>You can drag players between positions to swap them</li>
-              <li>Click START MATCH when the positions of both team are filled</li>
+              <li>You can drag players between positions to <strong>swap them</strong>. This also works if both slots already have players in them</li>
+              <li>Click START MATCH when the positions of both teams are filled</li>
               <li>Drag players from positions to an area with no slots</li>
               <li>Click ✕ on hand cards to discard unwanted players</li>
               <li>Use CLEAR to return field players to hand</li>
