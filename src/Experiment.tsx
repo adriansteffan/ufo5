@@ -55,7 +55,7 @@ const TASK_DESCRIPTIONS = {
   DatingGame:
     'Play matchmaker by helping virtual characters find their perfect partners. Make decisions about compatibility and relationship dynamics.',
   SportsGame:
-    'Manage footballs team through strategic decisions. Choose a lineup and formation and have the teams play each other.',
+    'Manage football teams through strategic decisions. Choose a lineup and formation and have the teams play each other.',
 };
 
 const groups = ['choice', 'anti-choice', 'random'];
@@ -554,7 +554,7 @@ const experiment = subsetExperimentByParam([
         type: 'WordGame',
         props: {
           timelimit: TASK_TIME_LIMIT,
-          showCorrectness: false,
+          showCorrectness: true,
         },
       },
     ],
@@ -592,7 +592,7 @@ const experiment = subsetExperimentByParam([
                 <li>Operations are evaluated left to right, e.g. 5 + 5 x 7 = 70</li>
                 <li>Each number and operator can be used multiple times</li>
                 <li>Press ENTER to submit your solution</li>
-                <li>Press DELETE undo the last operation</li>
+                <li>Press DELETE to undo the last operation</li>
                 <li>Press CLEAR to delete the entire current solution</li>
                 <li>Press NEW SET for a new pair of numbers and target</li>
               </ul>
@@ -641,9 +641,9 @@ const experiment = subsetExperimentByParam([
               <ul className='pl-5 mb-4'>
                 <li>Drag people from your hand to the matching slots</li>
                 <li>Click "MATCH" to create a blind date from the two slots</li>
-                <li>Click the red ✕ to send a person home an get a new one</li>
+                <li>Click the red ✕ to send a person home and get a new one</li>
                 <li>Click the profile picture to view a person in detail</li>
-                <li>Use "NEW HAND" to replace your whole hand people</li>
+                <li>Use "NEW HAND" to replace all people in your hand</li>
                 <li>
                   Clicking on cards in the slots will return them to your hand, "CLEAR" will return
                   both
@@ -697,7 +697,7 @@ const experiment = subsetExperimentByParam([
                 </li>
                 <li>Drag players from your hand to team positions on the field to assign them</li>
                 <li>You can drag players between positions to swap them</li>
-                <li>Click START MATCH when the positions of both team are filled</li>
+                <li>Click START MATCH when the positions of both teams are filled</li>
                 <li>Drag players from positions to an area with no slots</li>
                 <li>Click ✕ on hand cards to discard unwanted players</li>
                 <li>Use CLEAR to return field players to hand</li>
