@@ -219,6 +219,11 @@ export const judgeCouple = (person1: Person, person2: Person): number => {
   return score;
 };
 
+export const areRomanticallyCompatible = (person1: Person, person2: Person): boolean => {
+  const person1AttractedTo2 = person1.lookingFor === person2.gender || person1.lookingFor === 'both';
+  const person2AttractedTo1 = person2.lookingFor === person1.gender || person2.lookingFor === 'both';
+  return person1AttractedTo2 && person2AttractedTo1;
+};
 
 export const generateNewsMessage = (couples: { person1: Person; person2: Person; matchScore: number }[], maxRecentCouples: number = 5): string => {
   if (couples.length === 0) {

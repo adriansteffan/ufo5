@@ -8,6 +8,7 @@ import {
   createPersonGenerator,
   judgeCouple,
   generateNewsMessage,
+  areRomanticallyCompatible,
   type Person,
 } from '../utils/datinggamelogic';
 
@@ -442,7 +443,23 @@ export const DatingGame = ({
   const [enlargedPerson, setEnlargedPerson] = useState<Person | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [data, setData] = useState<DatingGameData>(() => {
-    const initialHand = Array.from({ length: MAX_HAND_SIZE }, () => generateRandomPerson());
+    // Build initial hand: first 2 random, cards 3-5 are 80% compatible with existing
+    const initialHand: Person[] = [];
+    for (let i = 0; i < MAX_HAND_SIZE; i++) {
+      if (initialHand.length < 2 || Math.random() >= 0.8) {
+        initialHand.push(generateRandomPerson());
+      } else {
+        let person: Person | null = null;
+        for (let attempt = 0; attempt < 20; attempt++) {
+          const candidate = generateRandomPerson();
+          if (initialHand.some(p => areRomanticallyCompatible(p, candidate))) {
+            person = candidate;
+            break;
+          }
+        }
+        initialHand.push(person ?? generateRandomPerson());
+      }
+    }
     return {
       peopleDatabase: [...initialHand],
       matchDatabase: [],
@@ -465,8 +482,18 @@ export const DatingGame = ({
     }
   }, [data.peopleDatabase, hand.length]);
 
-  const generateAndAddPerson = () => {
-    const person = generateRandomPerson();
+  const generateAndAddPerson = (existingPeople: Person[] = []) => {
+    let person: Person;
+    if (existingPeople.length > 0 && Math.random() < 0.8) {
+      // 80% chance: try to find a compatible person
+      person = generateRandomPerson();
+      for (let attempt = 0; attempt < 20; attempt++) {
+        if (existingPeople.some(p => areRomanticallyCompatible(p, person))) break;
+        person = generateRandomPerson();
+      }
+    } else {
+      person = generateRandomPerson();
+    }
     setData((prev) => ({
       ...prev,
       peopleDatabase: [...prev.peopleDatabase, person],
@@ -531,7 +558,8 @@ export const DatingGame = ({
   const handleExchangePerson = (personId: number) => {
     if (roundOver) return;
 
-    const newPerson = generateAndAddPerson();
+    const remainingHand = hand.filter((p) => p.id !== personId);
+    const newPerson = generateAndAddPerson(remainingHand);
 
     pushAction(ACTIONS.EXCHANGE_PERSON, [personId, newPerson.id]);
 
@@ -544,7 +572,13 @@ export const DatingGame = ({
     const cardsInSlots = (matchSlot1 ? 1 : 0) + (matchSlot2 ? 1 : 0);
     const newHandSize = MAX_HAND_SIZE - cardsInSlots;
 
-    const newHand = Array.from({ length: newHandSize }, () => generateAndAddPerson());
+    // Build incrementally: first 2 random, rest 80% compatible (include slot cards as existing)
+    const slotCards = [matchSlot1, matchSlot2].filter((p): p is Person => p !== null);
+    const newHand: Person[] = [];
+    for (let i = 0; i < newHandSize; i++) {
+      const existingPeople = [...slotCards, ...newHand];
+      newHand.push(generateAndAddPerson(existingPeople.length < 2 ? [] : existingPeople));
+    }
 
     pushAction(
       ACTIONS.GENERATE_NEW,
@@ -582,8 +616,8 @@ export const DatingGame = ({
 
     pushAction(ACTIONS.MATCH, [matchSlot1.id, matchSlot2.id]);
 
-    const newPerson1 = generateAndAddPerson();
-    const newPerson2 = generateAndAddPerson();
+    const newPerson1 = generateAndAddPerson(hand);
+    const newPerson2 = generateAndAddPerson([...hand, newPerson1]);
 
     pushAction(ACTIONS.ADD_TO_HAND, [newPerson1.id, newPerson2.id]);
 
