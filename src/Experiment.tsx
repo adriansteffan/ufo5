@@ -255,7 +255,7 @@ const experiment = subsetExperimentByParam([
           Thank you for participating in our research. In this study, we examine how people's
           engagement differs between various little games we have developed. Over the next 15
           minutes, you will answer a handful of survey questions and play one of these games
-          yourself. Press the button below to continue to the participat information and guidelines.
+          yourself. Press the button below to continue to the participant information and guidelines.
           <br />
         </div>
       ),
