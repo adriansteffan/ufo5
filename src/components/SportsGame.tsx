@@ -337,7 +337,6 @@ const MatchResultModal = ({
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        onClick={onClose}
       >
         <motion.div
           className='bg-white border-4 border-black rounded-lg shadow-[8px_8px_0px_rgba(0,0,0,1)] p-8 w-[600px] mx-4'
