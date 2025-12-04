@@ -459,7 +459,7 @@ export const DatingGame = ({
         initialHand.push(generateRandomPerson());
       } else {
         let person: Person | null = null;
-        for (let attempt = 0; attempt < 20; attempt++) {
+        for (let attempt = 0; attempt < 100; attempt++) {
           const candidate = generateRandomPerson();
           if (initialHand.some(p => areRomanticallyCompatible(p, candidate))) {
             person = candidate;
@@ -559,7 +559,7 @@ export const DatingGame = ({
     if (existingPeople.length > 0 && Math.random() < 0.8) {
       // 80% chance: try to find a compatible person
       person = generateRandomPerson();
-      for (let attempt = 0; attempt < 20; attempt++) {
+      for (let attempt = 0; attempt < 100; attempt++) {
         if (existingPeople.some(p => areRomanticallyCompatible(p, person))) break;
         person = generateRandomPerson();
       }
