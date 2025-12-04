@@ -1,10 +1,11 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { BaseComponentProps, now } from '@adriansteffan/reactive';
 import { motion, AnimatePresence } from 'motion/react';
 import { CgSearch } from 'react-icons/cg';
 import { FaStar, FaStarHalfAlt, FaRegStar } from 'react-icons/fa';
 import { HelpModal } from './HelpModal';
 import { Timer } from './Timer';
+import { TimeoutContinueModal } from './TimeoutContinueModal';
 import { useScaledDrag } from '../hooks/useScaledDrag';
 import {
   createPlayerGenerator,
@@ -30,6 +31,7 @@ const ACTIONS = {
   SIMULATE_MATCH: 'SIMULATE_MATCH',
   GAME_END: 'GAME_END',
   HELP: 'HELP',
+  POPUP_CONTINUE: 'POPUP_CONTINUE',
 } as const;
 
 interface ActionLog {
@@ -604,8 +606,10 @@ type GameState = 'setup' | 'playing' | 'finished';
 export const SportsGame = ({
   next,
   timelimit,
+  allowExtraMove = true,
 }: BaseComponentProps & {
   timelimit?: number;
+  allowExtraMove?: boolean;
 }) => {
   // generator to have a closured id counter
   const generateRandomPlayer = useMemo(() => createPlayerGenerator(), []);
@@ -616,6 +620,11 @@ export const SportsGame = ({
   const [matchResult, setMatchResult] = useState<MatchResult | null>(null);
   const [teamNames, setTeamNames] = useState(() => generateTeamNames());
   const [currentActionLog, setCurrentActionLog] = useState<ActionLog[]>([]);
+
+  // Graceful timeout state for SportsGame special case
+  const [timeEndedDuringMatch, setTimeEndedDuringMatch] = useState(false);
+  const [showTimeoutPopup, setShowTimeoutPopup] = useState(false);
+  const [isGracePeriod, setIsGracePeriod] = useState(false);
 
   const slotRefs = useRef<Record<TeamPosition, HTMLDivElement | null>>({
     defenseA: null,
@@ -641,6 +650,88 @@ export const SportsGame = ({
   });
 
   const [hand, setHand] = useState<Player[]>([]);
+
+  const dataRef = useRef(data);
+  const currentActionLogRef = useRef(currentActionLog);
+
+  // Keep refs in sync
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+  useEffect(() => {
+    currentActionLogRef.current = currentActionLog;
+  }, [currentActionLog]);
+
+  // handleGameEnd as a callback for use by timeout handlers
+  const handleGameEnd = useCallback(() => {
+    // Create final virtual round with remaining actions
+    const finalRound: RoundData = {
+      roundIndex: dataRef.current.rounds.length,
+      teamSetup: createEmptyTeamSetup(),
+      matchResult: null,
+      actionLog: [
+        ...currentActionLogRef.current,
+        {
+          actionIndex: currentActionLogRef.current.length,
+          action: ACTIONS.GAME_END,
+          timestamp: now(),
+        },
+      ],
+      startTime: now(),
+      endTime: now(),
+    };
+
+    const finalData: SportsGameData = {
+      ...dataRef.current,
+      rounds: [...dataRef.current.rounds, finalRound],
+    };
+
+    next({ sportsData: finalData });
+  }, [next]);
+
+  // Timer end handler - special handling for during match
+  const handleTimerEnd = useCallback(() => {
+    if (gameState === 'playing') {
+      // Time ended during match modal - flag it to show popup after modal closes
+      setTimeEndedDuringMatch(true);
+    } else if (allowExtraMove) {
+      // Not in match - show popup immediately
+      setShowTimeoutPopup(true);
+    } else {
+      // Feature disabled - end game immediately
+      setGameState('finished');
+    }
+  }, [gameState, allowExtraMove]);
+
+  // Popup response handlers - track choices before executing
+  const handlePopupContinue = useCallback(() => {
+    // Add action directly to ref to avoid race condition
+    const newAction: ActionLog = {
+      actionIndex: currentActionLogRef.current.length,
+      action: ACTIONS.POPUP_CONTINUE,
+      timestamp: now(),
+    };
+    currentActionLogRef.current = [...currentActionLogRef.current, newAction];
+    setCurrentActionLog(currentActionLogRef.current);
+
+    setShowTimeoutPopup(false);
+    setIsGracePeriod(true);
+    // Stay in setup mode to allow one more match
+  }, []);
+
+  const handlePopupEnd = useCallback(() => {
+    // No action logged here - handleGameEnd logs GAME_END
+    setShowTimeoutPopup(false);
+    setGameState('finished');
+    handleGameEnd();
+  }, [handleGameEnd]);
+
+  // Close enlarged player modal when timeout popup appears
+  useEffect(() => {
+    if (showTimeoutPopup && currentModal?.type === 'enlarged') {
+      setCurrentModal(null);
+    }
+  }, [showTimeoutPopup, currentModal]);
 
   // Initialize hand and action log after component mounts based on initial hand data
   useEffect(() => {
@@ -692,7 +783,7 @@ export const SportsGame = ({
   }, []);
 
   const handleDraftPlayer = () => {
-    if (roundOver || hand.length >= MAX_HAND_SIZE) return;
+    if ((roundOver) || hand.length >= MAX_HAND_SIZE) return;
 
     const newPlayer = generateRandomPlayer();
     setData((prev) => ({
@@ -791,8 +882,8 @@ export const SportsGame = ({
 
   const allSlotsFilled = Object.values(teamSetup).every(Boolean);
 
-  const roundOver = gameState === 'finished';
-  const isReady = gameState === 'setup' && allSlotsFilled;
+  // roundOver is true when game is truly finished (not during popup or grace)
+  const roundOver = gameState === 'finished' && !showTimeoutPopup && !isGracePeriod;
 
   // both teams get the same props - might be an idea to use a wrappercomponent instead
   const sharedSlotProps = useMemo(
@@ -809,7 +900,8 @@ export const SportsGame = ({
   );
 
   const handleSimulateMatch = () => {
-    if (gameState !== 'setup' || !allSlotsFilled) return;
+    // Allow during setup or during grace period
+    if ((gameState !== 'setup' && !isGracePeriod) || !allSlotsFilled) return;
 
     const result = simulateMatch(teamSetup);
     const tickerEvents = generateLiveTickerEvents(
@@ -903,38 +995,32 @@ export const SportsGame = ({
 
     setCurrentModal(null);
     setMatchResult(null);
-    setGameState('setup');
 
+    // Always clear slots and generate new team names when match ends
     setTeamSetup(createEmptyTeamSetup());
     setTeamNames(generateTeamNames());
-  };
 
-  const handleNext = () => {
-    pushAction(ACTIONS.GAME_END);
+    // If in grace period, this was the last move - show game over screen
+    if (isGracePeriod) {
+      setIsGracePeriod(false);
+      setGameState('finished');
+      // Don't call handleGameEnd - let user click END button
+      return;
+    }
 
-    // Create final virtual round with remaining actions
-    const finalRound: RoundData = {
-      roundIndex: data.rounds.length,
-      teamSetup: createEmptyTeamSetup(),
-      matchResult: null, // No match result for final round
-      actionLog: [
-        ...currentActionLog,
-        {
-          actionIndex: currentActionLog.length,
-          action: ACTIONS.GAME_END,
-          timestamp: now(),
-        },
-      ],
-      startTime: now(),
-      endTime: now(),
-    };
+    // If time ended during this match, show the popup now
+    if (timeEndedDuringMatch) {
+      setTimeEndedDuringMatch(false);
+      if (allowExtraMove) {
+        setShowTimeoutPopup(true);
+      } else {
+        setGameState('finished');
+      }
+      return;
+    }
 
-    const finalData: SportsGameData = {
-      ...data,
-      rounds: [...data.rounds, finalRound],
-    };
-
-    next({ sportsData: finalData });
+    // Normal flow - back to setup
+    setGameState('setup');
   };
 
   return (
@@ -945,13 +1031,16 @@ export const SportsGame = ({
         <div className='w-56 flex flex-col items-center'>
           <Timer
             timelimit={timelimit || 300}
-            roundOver={roundOver}
-            onEnd={() => setGameState('finished')}
+            roundOver={roundOver || showTimeoutPopup || isGracePeriod}
+            onEnd={handleTimerEnd}
+            graceMode={isGracePeriod}
           />
-          <div className='flex flex-col gap-3 mt-4'>
-            <ControlButton onClick={() => setCurrentModal({ type: 'help' })}>HELP</ControlButton>
-            <ControlButton onClick={handleClearAllSlots}>CLEAR</ControlButton>
-          </div>
+          {!roundOver && (
+            <div className='flex flex-col gap-3 mt-4'>
+              <ControlButton onClick={() => setCurrentModal({ type: 'help' })}>HELP</ControlButton>
+              <ControlButton onClick={handleClearAllSlots}>CLEAR</ControlButton>
+            </div>
+          )}
         </div>
 
         {/* Center - Field Layout */}
@@ -1002,18 +1091,18 @@ export const SportsGame = ({
             </div>
 
             <div className='flex flex-col items-center gap-4 mt-6'>
-              {gameState === 'setup' && (
+              {(gameState === 'setup' || isGracePeriod) && (
                 <ControlButton
                   onClick={handleSimulateMatch}
-                  disabled={!isReady}
+                  disabled={!allSlotsFilled}
                   size='lg'
                   className='z-20'
                 >
                   START MATCH
                 </ControlButton>
               )}
-              {gameState === 'finished' && (
-                <ControlButton onClick={handleNext} size='lg' className='z-20 hover:bg-gray-100'>
+              {roundOver && !showTimeoutPopup && !isGracePeriod && (
+                <ControlButton onClick={handleGameEnd} size='lg' className='z-20 hover:bg-gray-100'>
                   END
                 </ControlButton>
               )}
@@ -1077,7 +1166,7 @@ export const SportsGame = ({
           </div>
           <button
             onClick={handleDraftPlayer}
-            disabled={roundOver || hand.length >= MAX_HAND_SIZE}
+            disabled={(roundOver) || hand.length >= MAX_HAND_SIZE}
             className='w-32 h-48 border-2 border-black rounded-lg bg-white hover:bg-gray-100 disabled:bg-white disabled:cursor-not-allowed cursor-pointer flex flex-col items-center justify-center shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[1px_1px_0px_rgba(0,0,0,1)] pt-2 pb-6 select-none'
           >
             {hand.length >= MAX_HAND_SIZE ? (
@@ -1159,6 +1248,13 @@ export const SportsGame = ({
         teamNames={teamNames}
         tickerEvents={currentModal?.type === 'match' ? currentModal.tickerEvents : null}
         onClose={handleCloseMatchModal}
+      />
+
+      {/* Timeout Continue Modal */}
+      <TimeoutContinueModal
+        isOpen={showTimeoutPopup}
+        onContinue={handlePopupContinue}
+        onEnd={handlePopupEnd}
       />
     </div>
   );

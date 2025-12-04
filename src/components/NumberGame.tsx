@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { NUMBER_SETS } from '../utils/numbergamelist';
 import { BaseComponentProps, now, toast, Bounce } from '@adriansteffan/reactive';
 import { HelpModal } from './HelpModal';
 import { Timer } from './Timer';
+import { TimeoutContinueModal } from './TimeoutContinueModal';
+import { useGracefulTimeout } from '../hooks/useGracefulTimeout';
 
 interface ExpressionObj {
   expression: string;
@@ -32,7 +34,7 @@ type NumberGameData = {
   found: ExpressionData[];
 }[];
 
-export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseComponentProps) => {
+export const NumberGame = ({ next, timelimit, allowExtraMove = true }: {timelimit: number; allowExtraMove?: boolean} & BaseComponentProps) => {
   const initialSet = useMemo(() => {
     const set = NUMBER_SETS.sample()[0];
     return {
@@ -55,10 +57,73 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
   const [currentActionList, setCurrentActionList] = useState<ActionData[]>([]);
   const [currentExpression, setCurrentExpression] = useState('');
   const [foundExpressions, setFoundExpressions] = useState<ExpressionObj[]>([]);
-  const [roundOver, setRoundOver] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const [expectingOperator, setExpectingOperator] = useState(false);
   const submittingRef = useRef(false);
+  const dataRef = useRef(data);
+  const currentActionListRef = useRef(currentActionList);
+
+  // Keep refs in sync
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+  useEffect(() => {
+    currentActionListRef.current = currentActionList;
+  }, [currentActionList]);
+
+  const handleGameEnd = useCallback(() => {
+    // Add GAME_END action
+    const newAction = { actionIndex: currentActionListRef.current.length, button: 'GAME_END', timestamp: now() };
+    currentActionListRef.current = [...currentActionListRef.current, newAction];
+
+    const finalData = [...dataRef.current];
+    const currentRound = finalData[finalData.length - 1];
+    currentRound.found.push({
+      foundExpressionIndex: currentRound.found.length,
+      actions: currentActionListRef.current,
+      expression: null,
+      result: null,
+      submitTime: null,
+    });
+    next({ numbersData: finalData, completed: true });
+  }, [next]);
+
+  const {
+    handleTimerEnd,
+    handlePopupContinue,
+    handlePopupEnd,
+    handleMoveComplete,
+    showPopup,
+    isGracePeriod,
+    isGameEnded,
+  } = useGracefulTimeout({
+    enabled: allowExtraMove,
+    onGameEnd: handleGameEnd,
+  });
+
+  // Close help modal when timeout popup appears
+  useEffect(() => {
+    if (showPopup) {
+      setShowHelp(false);
+    }
+  }, [showPopup]);
+
+  // Wrapper handlers that track popup choices before calling hook handlers
+  const handlePopupContinueWithTracking = useCallback(() => {
+    // Add action directly to ref to avoid race condition
+    const newAction = { actionIndex: currentActionListRef.current.length, button: 'POPUP_CONTINUE', timestamp: now() };
+    currentActionListRef.current = [...currentActionListRef.current, newAction];
+    setCurrentActionList(prev => [...prev, newAction]);
+    handlePopupContinue();
+  }, [handlePopupContinue]);
+
+  const handlePopupEndWithTracking = useCallback(() => {
+    // No action logged here - handleGameEnd logs GAME_END
+    handlePopupEnd();
+  }, [handlePopupEnd]);
+
+  // Derive roundOver for UI compatibility
+  const roundOver = isGameEnded;
 
   const expressionsContainerRef = useRef<HTMLDivElement>(null);
   const formulaDisplayRef = useRef<HTMLDivElement>(null);
@@ -111,8 +176,8 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
   const NumberButton = ({ number }: { number: number }) => (
     <button
       className='w-20 h-20 rounded-lg bg-red-400 hover:bg-red-500 border-2 border-black font-bold text-3xl text-white shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-none disabled:opacity-50 cursor-pointer select-none'
-      onClick={() => !roundOver && handleButtonClick(number.toString())}
-      disabled={roundOver || expectingOperator}
+      onClick={() => (!roundOver || isGracePeriod) && handleButtonClick(number.toString())}
+      disabled={(roundOver) || expectingOperator}
     >
       {number}
     </button>
@@ -121,8 +186,8 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
   const OperatorButton = ({ operator, color }: { operator: string; color: string }) => (
     <button
       className={`w-16 h-16 rounded-full ${color} hover:opacity-80 border-2 border-black font-bold text-2xl text-white shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-none disabled:opacity-50 cursor-pointer select-none`}
-      onClick={() => !roundOver && handleButtonClick(operator)}
-      disabled={roundOver || !expectingOperator}
+      onClick={() => (!roundOver || isGracePeriod) && handleButtonClick(operator)}
+      disabled={(roundOver) || !expectingOperator}
     >
       {getDisplayOperator(operator)}
     </button>
@@ -240,6 +305,7 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
   };
 
   const handleSubmitExpression = () => {
+    // Allow during grace period, but not when game is ended
     if (roundOver) return;
     if (currentExpression.length === 0) return;
     if (!expectingOperator) return; // Can only submit after a number
@@ -296,6 +362,11 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
 
     setCurrentActionList([]);
     submittingRef.current = false;
+
+    // If in grace period, this was the last move - end the game
+    if (isGracePeriod) {
+      handleMoveComplete();
+    }
   };
 
   const handleNewNumberSet = () => {
@@ -328,20 +399,6 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
     setExpectingOperator(false);
   };
 
-  const handleNext = () => {
-    const finalData = [...data];
-    const currentRound = finalData[finalData.length - 1];
-    currentRound.found.push({
-      foundExpressionIndex: currentRound.found.length,
-      actions: currentActionList,
-      expression: null,
-      result: null,
-      submitTime: null,
-    });
-
-    next({ numbersData: finalData, completed: true });
-  };
-
   // Auto-scroll formula display and expression collection
   useEffect(() => {
     if (expressionsContainerRef.current) {
@@ -356,6 +413,7 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Allow keyboard input during grace period
       if (roundOver) return;
 
       if (event.key === 'Enter') {
@@ -369,7 +427,7 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [roundOver, currentExpression, expectingOperator, currentNumberSet]);
+  }, [roundOver, isGracePeriod, currentExpression, expectingOperator, currentNumberSet]);
 
   return (
     <div className='min-h-screen w-full bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]'>
@@ -378,12 +436,13 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
         <div className='lg:w-56 lg:px-12 lg:p-4 flex flex-col items-center gap-4'>
           <Timer
             timelimit={timelimit}
-            roundOver={roundOver}
-            onEnd={() => setRoundOver(true)}
+            roundOver={roundOver || showPopup || isGracePeriod}
+            onEnd={handleTimerEnd}
+            graceMode={isGracePeriod}
             className=''
           />
           {/* Control buttons */}
-          {!roundOver && (
+          {(!roundOver || isGracePeriod) && (
             <div className='hidden lg:flex flex-col gap-4 items-center'>
               <ControlButton
                 onClick={() => {
@@ -431,7 +490,7 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
                   {currentExpression ? (
                     <>
                       {renderExpression(currentExpression)}
-                      {!roundOver && (
+                      {(!roundOver || isGracePeriod) && (
                         <span
                           className='inline-block'
                           style={{
@@ -447,7 +506,7 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
                   ) : roundOver ? (
                     "TIME'S UP!"
                   ) : (
-                    !roundOver && (
+                    (!roundOver || isGracePeriod) && (
                       <span
                         className='inline-block'
                         style={{
@@ -494,7 +553,7 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
 
             {/* Control Buttons */}
             <div className='mt-4'>
-              {!roundOver && (
+              {(!roundOver || isGracePeriod) && (
                 <>
                   <div className='flex gap-4 justify-center mb-4'>
                     <ControlButton
@@ -535,7 +594,7 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
               )}
               {roundOver && (
                 <div className='flex justify-center'>
-                  <ControlButton onClick={handleNext} className='px-6 py-3 text-lg'>
+                  <ControlButton onClick={handleGameEnd} className='px-6 py-3 text-lg'>
                     END
                   </ControlButton>
                 </div>
@@ -584,6 +643,13 @@ export const NumberGame = ({ next, timelimit }: {timelimit: number} & BaseCompon
           <li>• Press NEW SET for a new pair of numbers and target</li>
         </ul>
       </HelpModal>
+
+      {/* Timeout Continue Modal */}
+      <TimeoutContinueModal
+        isOpen={showPopup}
+        onContinue={handlePopupContinueWithTracking}
+        onEnd={handlePopupEndWithTracking}
+      />
 
       <style>{`
         @keyframes blink {

@@ -1,10 +1,12 @@
-import React, { useEffect, useRef, useState, useMemo } from 'react';
+import React, { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { BaseComponentProps, now } from '@adriansteffan/reactive';
 import { motion, AnimatePresence } from 'motion/react';
 import { CgSearch } from 'react-icons/cg';
 import { HelpModal } from './HelpModal';
 import { Timer } from './Timer';
+import { TimeoutContinueModal } from './TimeoutContinueModal';
 import { useScaledDrag } from '../hooks/useScaledDrag';
+import { useGracefulTimeout } from '../hooks/useGracefulTimeout';
 import {
   createPersonGenerator,
   judgeCouple,
@@ -26,6 +28,7 @@ const ACTIONS = {
   ADD_TO_HAND: 'ADD_TO_HAND',
   GAME_END: 'GAME_END',
   HELP: 'HELP',
+  POPUP_CONTINUE: 'POPUP_CONTINUE',
 } as const;
 
 interface Couple {
@@ -430,8 +433,10 @@ const isEnlargeAreaClick = (e: Event): boolean => {
 export const DatingGame = ({
   next,
   timelimit,
+  allowExtraMove = true,
 }: {
   timelimit: number;
+  allowExtraMove?: boolean;
 } & BaseComponentProps) => {
   // generator to have a closured id counter
   const generateRandomPerson = useMemo(() => createPersonGenerator(), []);
@@ -444,7 +449,6 @@ export const DatingGame = ({
   const [matchSlot2, setMatchSlot2] = useState<Person | null>(null);
   const [dragOverSlot, setDragOverSlot] = useState<number | null>(null);
   const [couples, setCouples] = useState<Couple[]>([]);
-  const [roundOver, setRoundOver] = useState(false);
   const [enlargedPerson, setEnlargedPerson] = useState<Person | null>(null);
   const [showHelp, setShowHelp] = useState(false);
   const [data, setData] = useState<DatingGameData>(() => {
@@ -479,6 +483,69 @@ export const DatingGame = ({
       starttime: now(),
     };
   });
+
+  const dataRef = useRef(data);
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+
+  const handleGameEnd = useCallback(() => {
+    // pushAction equivalent inline since we need to use ref
+    const actionLog = {
+      actionIndex: dataRef.current.actionLog.length,
+      action: ACTIONS.GAME_END,
+      timestamp: now(),
+    };
+    const finalData = {
+      ...dataRef.current,
+      actionLog: [...dataRef.current.actionLog, actionLog],
+    };
+    next({ datingData: finalData });
+  }, [next]);
+
+  const {
+    handleTimerEnd,
+    handlePopupContinue,
+    handlePopupEnd,
+    handleMoveComplete,
+    showPopup,
+    isGracePeriod,
+    isGameEnded,
+  } = useGracefulTimeout({
+    enabled: allowExtraMove,
+    onGameEnd: handleGameEnd,
+  });
+
+  // Close enlarged card modal when timeout popup appears
+  useEffect(() => {
+    if (showPopup) {
+      setEnlargedPerson(null);
+    }
+  }, [showPopup]);
+
+  // Wrapper handlers that track popup choices before calling hook handlers
+  const handlePopupContinueWithTracking = useCallback(() => {
+    // Add action directly to ref to avoid race condition
+    const newAction: ActionLog = {
+      actionIndex: dataRef.current.actionLog.length,
+      action: ACTIONS.POPUP_CONTINUE,
+      timestamp: now(),
+    };
+    dataRef.current = {
+      ...dataRef.current,
+      actionLog: [...dataRef.current.actionLog, newAction],
+    };
+    setData(dataRef.current);
+    handlePopupContinue();
+  }, [handlePopupContinue]);
+
+  const handlePopupEndWithTracking = useCallback(() => {
+    // No action logged here - handleGameEnd logs GAME_END
+    handlePopupEnd();
+  }, [handlePopupEnd]);
+
+  // Derive roundOver for UI compatibility
+  const roundOver = isGameEnded;
 
   // Initialize hand from database on component mount (ensures parity)
   React.useEffect(() => {
@@ -594,7 +661,8 @@ export const DatingGame = ({
   };
 
   const handleMatch = () => {
-    if (roundOver || !matchSlot1 || !matchSlot2) return;
+    // Allow during grace period, but not when game is ended
+    if ((roundOver) || !matchSlot1 || !matchSlot2) return;
 
     const matchScore = judgeCouple(matchSlot1, matchSlot2);
     const matchTime = now();
@@ -633,6 +701,11 @@ export const DatingGame = ({
 
     setMatchSlot1(null);
     setMatchSlot2(null);
+
+    // If in grace period, this was the last move - end the game
+    if (isGracePeriod) {
+      handleMoveComplete();
+    }
   };
 
   const handleClearSlots = () => {
@@ -658,12 +731,6 @@ export const DatingGame = ({
     }
   };
 
-  const handleNext = () => {
-    pushAction(ACTIONS.GAME_END);
-    next({ datingData: data });
-  };
-
-
   const handleSlotTap = useMemo(
     () => (slotNumber: 1 | 2, e: Event) => {
       if (isEnlargeAreaClick(e)) return; // fix due to wonky propagation of onClick for motion.dev onTap
@@ -688,7 +755,7 @@ export const DatingGame = ({
       <div className='p-2 flex mt-8'>
         {/* Left Side - Timer */}
         <div className='w-56 flex flex-col items-center'>
-          <Timer timelimit={timelimit || 300} roundOver={roundOver} onEnd={() => setRoundOver(true)} />
+          <Timer timelimit={timelimit || 300} roundOver={roundOver || showPopup || isGracePeriod} onEnd={handleTimerEnd} graceMode={isGracePeriod} />
           <ControlButton
             onClick={() => {
               pushAction(ACTIONS.HELP);
@@ -725,7 +792,7 @@ export const DatingGame = ({
             </div>
 
             {/* Control Buttons */}
-            {!roundOver && (
+            {(!roundOver || isGracePeriod) && (
               <div className='flex gap-4 mt-5'>
                 <ControlButton onClick={handleClearSlots} className='px-4 py-3 text-lg'>
                   CLEAR
@@ -745,7 +812,7 @@ export const DatingGame = ({
 
             {roundOver && (
               <ControlButton
-                onClick={handleNext}
+                onClick={handleGameEnd}
                 className='px-6 mt-5 py-3 text-lg flex items-center justify-center'
               >
                 END
@@ -794,7 +861,7 @@ export const DatingGame = ({
             </AnimatePresence>
           </div>
 
-          {!roundOver && couples.length > 0 && <NewsTicker couples={couples} />}
+          {(!roundOver || isGracePeriod) && couples.length > 0 && <NewsTicker couples={couples} />}
         </div>
       </div>
 
@@ -852,6 +919,13 @@ export const DatingGame = ({
       {enlargedPerson && (
         <EnlargedCardModal person={enlargedPerson} onClose={() => setEnlargedPerson(null)} />
       )}
+
+      {/* Timeout Continue Modal */}
+      <TimeoutContinueModal
+        isOpen={showPopup}
+        onContinue={handlePopupContinueWithTracking}
+        onEnd={handlePopupEndWithTracking}
+      />
     </div>
   );
 };

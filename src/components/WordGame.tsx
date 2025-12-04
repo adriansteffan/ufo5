@@ -1,8 +1,10 @@
-import { useEffect, useRef, useState, useMemo } from 'react';
+import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
 import { LETTER_SETS } from '../utils/wordgamelist';
 import { BaseComponentProps, now, toast, Bounce } from '@adriansteffan/reactive';
 import { HelpModal } from './HelpModal';
 import { Timer } from './Timer';
+import { TimeoutContinueModal } from './TimeoutContinueModal';
+import { useGracefulTimeout } from '../hooks/useGracefulTimeout';
 
 interface WordObj {
   word: string;
@@ -13,6 +15,7 @@ interface WordObj {
 interface WordGameProps extends BaseComponentProps {
   timelimit: number;
   showCorrectness?: boolean;
+  allowExtraMove?: boolean;
 }
 
 interface ActionData {
@@ -36,7 +39,7 @@ type WordGameData = {
   found: WordData[];
 }[];
 
-export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGameProps) => {
+export const WordGame = ({ next, timelimit, showCorrectness = true, allowExtraMove = true }: WordGameProps) => {
   const initialSet = useMemo(() => {
     const set = LETTER_SETS.sample()[0];
     return {
@@ -57,16 +60,79 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
   const [currentActionList, setCurrentActionList] = useState<ActionData[]>([]);
   const [currentWord, setCurrentWord] = useState('');
   const [foundWords, setFoundWords] = useState<WordObj[]>([]);
-  const [roundOver, setRoundOver] = useState(false);
   const [showHelp, setShowHelp] = useState(false);
   const submittingRef = useRef(false);
+  const dataRef = useRef(data);
+  const currentActionListRef = useRef(currentActionList);
+
+  // Keep refs in sync
+  useEffect(() => {
+    dataRef.current = data;
+  }, [data]);
+  useEffect(() => {
+    currentActionListRef.current = currentActionList;
+  }, [currentActionList]);
+
+  const handleGameEnd = useCallback(() => {
+    // Add GAME_END action
+    const newAction = { actionIndex: currentActionListRef.current.length, button: 'GAME_END', timestamp: now() };
+    currentActionListRef.current = [...currentActionListRef.current, newAction];
+
+    const finalData = [...dataRef.current];
+    const currentRound = finalData[finalData.length - 1];
+    currentRound.found.push({
+      foundWordIndex: currentRound.found.length,
+      actions: currentActionListRef.current,
+      word: null,
+      isCorrect: null,
+      submitTime: null,
+    });
+    next(finalData);
+  }, [next]);
+
+  const {
+    handleTimerEnd,
+    handlePopupContinue,
+    handlePopupEnd,
+    handleMoveComplete,
+    showPopup,
+    isGracePeriod,
+    isGameEnded,
+  } = useGracefulTimeout({
+    enabled: allowExtraMove,
+    onGameEnd: handleGameEnd,
+  });
+
+  // Close help modal when timeout popup appears
+  useEffect(() => {
+    if (showPopup) {
+      setShowHelp(false);
+    }
+  }, [showPopup]);
+
+  // Wrapper handlers that track popup choices before calling hook handlers
+  const handlePopupContinueWithTracking = useCallback(() => {
+    // Add action directly to ref to avoid race condition
+    const newAction = { actionIndex: currentActionListRef.current.length, button: 'POPUP_CONTINUE', timestamp: now() };
+    currentActionListRef.current = [...currentActionListRef.current, newAction];
+    setCurrentActionList(prev => [...prev, newAction]);
+    handlePopupContinue();
+  }, [handlePopupContinue]);
+
+  const handlePopupEndWithTracking = useCallback(() => {
+    // No action logged here - handleGameEnd logs GAME_END
+    handlePopupEnd();
+  }, [handlePopupEnd]);
+
+  // Derive roundOver for UI compatibility
+  const roundOver = isGameEnded;
 
   const wordsContainerRef = useRef<HTMLDivElement>(null);
 
   const LetterButton = ({ letter }: { letter: string }) => (
     <button
       className={`w-20 h-20 rounded-full bg-yellow-300 hover:bg-yellow-400 border-2 border-black font-bold text-2xl shadow-[3px_3px_0px_rgba(0,0,0,1)] hover:translate-x-[3px] hover:translate-y-[3px] hover:shadow-none disabled:opacity-50 cursor-pointer select-none`}
-      onClick={() => !roundOver && handleLetterClick(letter)}
+      onClick={() => (!roundOver || isGracePeriod) && handleLetterClick(letter)}
       disabled={roundOver}
       tabIndex={-1}
     >
@@ -104,6 +170,7 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
 
   useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
+      // Allow keyboard input during grace period
       if (roundOver) return;
 
       if (event.key === 'Enter') {
@@ -117,7 +184,7 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [roundOver, currentWord, foundWords, currentLetterSet]);
+  }, [roundOver, isGracePeriod, currentWord, foundWords, currentLetterSet]);
 
   const handleLetterClick = (letter: string) => {
     if (roundOver) return;
@@ -147,6 +214,7 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
   };
 
   const handleSubmitWord = () => {
+    // Allow during grace period, but not when game is ended
     if (roundOver) return;
     if (currentWord.length === 0) return;
     if (submittingRef.current) return;
@@ -203,6 +271,11 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
 
     setCurrentActionList([]);
     submittingRef.current = false;
+
+    // If in grace period, this was the last move - end the game
+    if (isGracePeriod) {
+      handleMoveComplete();
+    }
   };
 
   const handleShuffleLetters = () => {
@@ -238,20 +311,6 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
     setFoundWords([]);
   };
 
-  const handleNext = () => {
-    const finalData = [...data];
-    const currentRound = finalData[finalData.length - 1];
-    currentRound.found.push({
-      foundWordIndex: currentRound.found.length,
-      actions: currentActionList,
-      word: null,
-      isCorrect: null,
-      submitTime: null,
-    });
-
-    next(finalData);
-  };
-
   return (
     <div className='min-h-screen w-full bg-white bg-[radial-gradient(#e5e7eb_1px,transparent_1px)] [background-size:16px_16px]'>
       <div className='p-4 pt-8 pb-10 lg:pt-24 max-w-7xl mx-auto flex flex-col lg:flex-row gap-6 justify-center lg:min-h-screen'>
@@ -259,13 +318,14 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
         <div className='lg:w-56 lg:px-12 lg:p-4 flex flex-col items-center gap-4'>
           <Timer
             timelimit={timelimit}
-            roundOver={roundOver}
-            onEnd={() => setRoundOver(true)}
+            roundOver={roundOver || showPopup || isGracePeriod}
+            onEnd={handleTimerEnd}
+            graceMode={isGracePeriod}
             className=''
           />
 
           {/* CLEAR and NEW SET buttons in the horizontal layout */}
-          {!roundOver && (
+          {(!roundOver || isGracePeriod) && (
             <div className='hidden lg:flex flex-col gap-4 items-center'>
               <ControlButton
                 onClick={handleShuffleLetters}
@@ -308,7 +368,7 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
             <div className='min-h-[60px] flex items-center'>
               <div className='text-4xl font-bold tracking-wider min-w-[200px] text-center'>
                 {currentWord || (roundOver ? "TIME'S UP!" : '')}
-                {!roundOver && (
+                {(!roundOver || isGracePeriod) && (
                   <span
                     className='inline-block'
                     style={{
@@ -354,13 +414,13 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
 
             {/* Control Buttons */}
             <div className='mt-4'>
-              {!roundOver && (
+              {(!roundOver || isGracePeriod) && (
                 <>
                   {/* Top row - ⌫ DELETE and ENTER */}
                   <div className='flex gap-4 justify-center mb-4'>
                     <ControlButton
                       onClick={handleBackspace}
-                      disabled={roundOver || currentWord.length === 0}
+                      disabled={(roundOver) || currentWord.length === 0}
                       className='py-3 text-sm md:text-lg'
                     >
                       DELETE
@@ -393,7 +453,7 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
               )}
               {roundOver && (
                 <div className='flex justify-center'>
-                  <ControlButton onClick={handleNext} className='px-6 py-3 text-lg'>
+                  <ControlButton onClick={handleGameEnd} className='px-6 py-3 text-lg'>
                     END
                   </ControlButton>
                 </div>
@@ -440,6 +500,13 @@ export const WordGame = ({ next, timelimit, showCorrectness = true }: WordGamePr
           <li>• Press NEW SET for different letters</li>
         </ul>
       </HelpModal>
+
+      {/* Timeout Continue Modal */}
+      <TimeoutContinueModal
+        isOpen={showPopup}
+        onContinue={handlePopupContinueWithTracking}
+        onEnd={handlePopupEndWithTracking}
+      />
     </div>
   );
 };

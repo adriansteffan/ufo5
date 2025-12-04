@@ -5,9 +5,10 @@ interface TimerProps {
   roundOver: boolean;
   onEnd: () => void;
   className?: string;
+  graceMode?: boolean;
 }
 
-export const Timer = React.memo(({ timelimit, roundOver, onEnd, className = '' }: TimerProps) => {
+export const Timer = React.memo(({ timelimit, roundOver, onEnd, className = '', graceMode = false }: TimerProps) => {
   const [timeLeft, setTimeLeft] = useState(timelimit);
 
   useEffect(() => {
@@ -27,10 +28,16 @@ export const Timer = React.memo(({ timelimit, roundOver, onEnd, className = '' }
     }
   }, [timeLeft, roundOver, onEnd]);
 
+  const displayText = graceMode
+    ? 'Last Move!'
+    : roundOver
+      ? 'END'
+      : `${Math.floor(timeLeft / 60)}:${(timeLeft % 60).toString().padStart(2, '0')}`;
+
   return (
     <div className={`p-2 pt-4 flex justify-center ${className}`}>
       <div className='text-2xl font-bold text-center'>
-        {Math.floor(timeLeft / 60)}:{(timeLeft % 60).toString().padStart(2, '0')}
+        {displayText}
       </div>
     </div>
   );

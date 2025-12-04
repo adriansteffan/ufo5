@@ -603,6 +603,7 @@ const experiment = subsetExperimentByParam([
         props: {
           timelimit: TASK_TIME_LIMIT,
           showCorrectness: true,
+          allowExtraMove: true,
         },
       },
     ],
@@ -653,6 +654,7 @@ const experiment = subsetExperimentByParam([
         type: 'NumberGame',
         props: {
           timelimit: TASK_TIME_LIMIT,
+          allowExtraMove: true,
         },
       },
     ],
@@ -706,6 +708,7 @@ const experiment = subsetExperimentByParam([
         type: 'DatingGame',
         props: {
           timelimit: TASK_TIME_LIMIT,
+          allowExtraMove: true,
         },
       },
     ],
@@ -762,6 +765,7 @@ const experiment = subsetExperimentByParam([
         type: 'SportsGame',
         props: {
           timelimit: TASK_TIME_LIMIT,
+          allowExtraMove: true,
         },
       },
     ],
