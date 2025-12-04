@@ -361,9 +361,8 @@ const experiment = subsetExperimentByParam([
           </p>
           <p>
             <strong>Data protection and anonymity:</strong> <br />
-            Apart from age and TODO, no personal data are collected as part of this study. It is
-            therefore not possible for us to personally identify you. As a user of Prolific, you
-            have entered into a separate{' '}
+            No personal data apart from the Prolific ID are collected as part of this study.
+            As a user of Prolific, you have entered into a separate{' '}
             <a target='_blank' href='https://participant-help.prolific.com/en/article/498241'>
               personal data processing agreement with Prolific
             </a>
@@ -534,14 +533,7 @@ const experiment = subsetExperimentByParam([
     },
   },
 
-  // NFC questionnaire for "pre" group (before game)
-  {
-    type: 'IF_BLOCK',
-    cond: () => QUESTION_GROUP === 'pre',
-    timeline: [nfcQuestionnaire],
-  },
-
-  // For random group - wheel of fortune
+  // For random group - wheel of fortune (before NFC questionnaire)
   {
     type: 'IF_BLOCK',
     cond: () => PARTICIPANT_GROUP === 'random',
@@ -558,6 +550,13 @@ const experiment = subsetExperimentByParam([
         }),
       },
     ],
+  },
+
+  // NFC questionnaire for "pre" group (before game)
+  {
+    type: 'IF_BLOCK',
+    cond: () => QUESTION_GROUP === 'pre',
+    timeline: [nfcQuestionnaire],
   },
 
   {
