@@ -28,6 +28,9 @@ ios
 *.sw?
 
 data
+raw_data_joined
+preprocessed
+simulations
 .env
 
 # Tools dependencies
@@ -36,3 +39,4 @@ data
 
 CLAUDE.md
 .claude
+.Rproj.user
