@@ -103,7 +103,6 @@ compute_numbergame_dvs <- function(data, session_id) {
     group_by(roundIndex, foundExpressionIndex) %>%
     summarise(
       n_actions = max(actionIndex) + 1,
-      n_deletes = sum(button == "DELETE", na.rm = TRUE),
       .groups = "drop"
     )
 
