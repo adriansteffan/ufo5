@@ -56,19 +56,19 @@ Reads joined data from `raw_data_joined/` and simulation baselines from `simulat
 When processing new data, run the scripts in this order:
 
 1. **Precompute scripts** (one-time, or when regenerating baselines)
-   ```r
-   source("precompute_dating_matchscore.R")
-   source("precompute_sports_fitness.R")
+   ```bash
+   Rscript precompute_dating_matchscore.R
+   Rscript precompute_sports_fitness.R
    ```
 
 2. **join.R** (when new participant data arrives in `data/`)
-   ```r
-   source("join.R")
+   ```bash
+   Rscript join.R
    ```
 
 3. **main.R** (after running join.R, or after modifying main.R)
-   ```r
-   source("main.R")
+   ```bash
+   Rscript main.R
    ```
 
 ## Important Notes
