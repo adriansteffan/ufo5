@@ -218,8 +218,8 @@ export const TRAIT_DISPLAY_WORDS = {
 };
 
 export const MISC_DISPLAY_WORDS = {
-  cats: { positive: ['Cat lover', 'Feline friend'], negative: ['Dog-only person'] },
-  dogs: { positive: ['Dog lover', 'Puppy person'], negative: ['Cat-only person'] },
+  cats: { positive: ['Cat lover', 'Feline friend'], negative: ['Dislikes cats'] },
+  dogs: { positive: ['Dog lover', 'Puppy person'], negative: ['Dislikes dogs'] },
   smoking: { positive: ['Smoker'], negative: ['Non-smoker'] },
   drinking: {
     positive: ['Social drinker', 'Wine enthusiast'],
@@ -227,15 +227,15 @@ export const MISC_DISPLAY_WORDS = {
   },
   travel: {
     positive: ['Wanderlust', 'Travel addict', 'Globetrotter'],
-    negative: ['Stay-at-home type'],
+    negative: ['Scared of flying'],
   },
   cooking: {
     positive: ['Foodie', 'Home chef', 'Kitchen wizard'],
     negative: ['Takeout specialist'],
   },
-  reading: { positive: ['Bookworm', 'Reader', 'Literary type'], negative: ['Audio-visual person'] },
-  music: { positive: ['Music lover', 'Melody seeker'], negative: ['Silence preferer'] },
-  movies: { positive: ['Film buff', 'Cinema lover'], negative: ['Book over movie'] },
+  reading: { positive: ['Bookworm', 'Reader', 'Literary type'], negative: ['Book hater'] },
+  music: { positive: ['Music lover', 'Melody seeker'], negative: ['Music hater'] },
+  movies: { positive: ['Film buff', 'Cinema lover'], negative: ['Movie hater'] },
   outdoors: {
     positive: ['Nature lover', 'Outdoorsy', 'Fresh-air seeker'],
     negative: ['Indoor enthusiast'],
