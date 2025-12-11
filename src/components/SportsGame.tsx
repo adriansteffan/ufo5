@@ -1204,9 +1204,9 @@ export const SportsGame = ({
               <li>Drag players from your hand to team positions on the field to assign them</li>
               <li>You can drag players between positions to <strong>swap them</strong>. This also works if both slots already have players in them</li>
               <li>Click START MATCH when the positions of both teams are filled</li>
-              <li>Drag players from positions to an area with no slots</li>
+              <li>Drag players from positions to an area with no slots to return them back to the hand</li>
               <li>Click ✕ on hand cards to discard unwanted players</li>
-              <li>Use CLEAR to return field players to hand</li>
+              <li>Use CLEAR to return all field players to hand</li>
             </ul>
           </div>
         </div>

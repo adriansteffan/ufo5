@@ -312,7 +312,7 @@ const experiment = subsetExperimentByParam([
             <strong className='font-atkinson'>Welcome to our study!</strong>
           </h1>
           Thank you for participating in our research. In this study, we examine how people's
-          engagement differs between various little games we have developed. Over the next 15
+          engagement differs between various little games we have developed. Over the next 10
           minutes, you will answer a handful of survey questions and play one of these games
           yourself. Press the button below to continue to the participant information and
           guidelines.
@@ -751,9 +751,9 @@ const experiment = subsetExperimentByParam([
                   works if both slots already have players in them
                 </li>
                 <li>Click START MATCH when the positions of both teams are filled</li>
-                <li>Drag players from positions to an area with no slots</li>
+                <li>Drag players from positions to an area with no slots to send them back to the hand</li>
                 <li>Click ✕ on hand cards to discard unwanted players</li>
-                <li>Use CLEAR to return field players to hand</li>
+                <li>Use CLEAR to return all field players to hand</li>
               </ul>
             </div>
           ),
